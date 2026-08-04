@@ -104,6 +104,34 @@ Own instance — the reference deployment's association sets are admin-gated by 
 
 Deployed at ledger 3958947. Trees: 10 levels. Proofs: Groth16 over BN254, verified on-chain through native host functions (CAP-0074, CAP-0080).
 
+## Permissioned token (Stellar testnet)
+
+Seven-contract ERC-3643 stack, deployed by [`scripts/deploy-rwa.sh`](../scripts/deploy-rwa.sh).
+
+| Contract | Address |
+|---|---|
+| RWA token — `RDXN` | `CCQW3X2XIYOVAEBRYVC25CRBY6NVGTW4K42HYU6Y34KHOMKL2H4LJZ2V` |
+| Identity registry | `CCO2EI7P325L2OAR4NQHPUO25AXYBTMPC7DI6JSW5BTPGPCKA27J33SK` |
+| Identity verifier | `CARCZ47PIRP2JCN3VEJ42UIWTWZ7SGKM764ZH554P3O2ODXI7P4VMKT6` |
+| Compliance | `CA4EI7P5TO4Y2FAGX3QT7WB3OQL2VP3BQ7CQUUZRQZRN5GCW76LH2M7N` |
+| Claim topics & issuers | `CC4EK5WXC5BRK464AQSMBMQFRFQIS3IWLBTAF7KL3CEVA3JJYL53OG47` |
+| Claim issuer | `CDBVWZMFQHZXY3D5JI2PS5OCE3T4GRUUYKU56OOWMYLPGSTQQHGXPCXD` |
+
+Five holders, each with a per-investor identity contract carrying Ed25519-signed KYC and
+AML claims. Positions are uneven and entry dates differ — coupons accrue per day from the
+entry date, so a coupon is not a fixed fraction of a (publicly readable) balance.
+
+**Policy enforcement, demonstrated:**
+
+| Attempt | Result |
+|---|---|
+| `transfer` between two credentialed holders | [confirmed](https://stellar.expert/explorer/testnet/tx/1a0023ce550b28b267f5f0ee9ab7e92a16f4b50bdfc5db0f55075da7c8002308) |
+| `transfer` to an address with no KYC claim | **rejected** — `Error(Contract, #321)` `IdentityNotFound`, raised by `verify_identity` |
+
+The rejection surfaces during **simulation**: standard tooling never submits the
+transaction, so the failure is visible in the wallet and the RPC response rather than as a
+failed transaction on the explorer.
+
 ## Reference run
 
 The full cycle, executed against the deployment above. Every hash is public.
