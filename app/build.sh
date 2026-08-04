@@ -22,6 +22,7 @@ const api = sdk.default ?? sdk;
 export const Keypair = api.Keypair;
 export const hash = api.hash;
 export const TransactionBuilder = api.TransactionBuilder;
+export const contract = api.contract;   // generated contract clients (token, registry)
 ENTRY
 
 npx esbuild vendor/.stellar-entry.js \

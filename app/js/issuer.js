@@ -13,6 +13,7 @@ import {
   openAccount, pool as openPool, onProgress, describeResult, resolveRecipient, client,
 } from './sdk-facade.js';
 import { LocalSigner } from './local-signer.js';
+import { mint, PolicyRefusal } from './token.js';
 
 const el = (id) => document.getElementById(id);
 let demo;
@@ -108,6 +109,7 @@ async function toggleCredential(name) {
     holder.credentialValid = !revoking;
     renderHolders();
     renderCoupons();
+    renderMintTargets();
     if (out.hash) pushFeed(`${revoking ? 'revoked' : 'restored'} ${name}`, out.hash);
 
     setProgress('sync-progress', revoking
@@ -140,6 +142,66 @@ async function syncPolicy() {
     setProgress('sync-progress', `failed: ${error?.message ?? error}`);
   } finally {
     el('btn-sync').disabled = false;
+  }
+}
+
+function renderMintTargets() {
+  el('mint-to').innerHTML = demo.holders
+    .map((h) => `<option value="${h.name}">${h.name}${h.credentialValid ? '' : ' — revoked'}</option>`)
+    .join('');
+}
+
+/**
+ * Issues tokens, and shows the refusal as clearly as the success.
+ *
+ * A revoked recipient is turned away by the contract itself. Since that happens
+ * in simulation, there is no failed transaction to link to — the honest thing to
+ * show is the contract's refusal, and to say why nothing reached the ledger.
+ */
+async function issueTokens() {
+  const name = el('mint-to').value;
+  const holder = demo.holders.find((h) => h.name === name);
+  const amount = Number(el('mint-amount').value);
+
+  el('btn-mint').disabled = true;
+  el('mint-out').innerHTML = '';
+  setProgress('mint-progress', `issuing ${fmt(amount, 0)} ${demo.token.symbol} to ${name}…`, 'simulate');
+
+  try {
+    const hash = await mint({
+      tokenContract: demo.token.contract,
+      to: holder.address,
+      amount,
+      decimals: demo.token.decimals,
+      signer: new LocalSigner(demo.issuer.secret, NETWORK_PASSPHRASE),
+    });
+
+    holder.position += amount;
+    renderHolders();
+    renderCoupons();
+    if (hash) pushFeed(`issued ${fmt(amount, 0)} ${demo.token.symbol} → ${name}`, hash);
+
+    el('mint-out').innerHTML = `<p class="hint">
+      <span class="badge ok">accepted</span> ${name} holds a valid credential, so the
+      token moved.</p>`;
+    setProgress('mint-progress', '', 'done');
+  } catch (error) {
+    if (error instanceof PolicyRefusal) {
+      el('mint-out').innerHTML = `
+        <p style="font: 400 20px/1.2 var(--serif); margin:0 0 10px; color:var(--refused)">Refused by the token</p>
+        <p class="hint">${error.message} <span class="mono-sm">(contract error #${error.code})</span></p>
+        <p class="hint" style="margin-top:10px">
+          Nothing reached the ledger: the contract refuses during simulation, so no
+          transaction was ever built. This is the token enforcing its own policy — not the
+          interface declining on its behalf.
+        </p>`;
+      setProgress('mint-progress', '');
+    } else {
+      setProgress('mint-progress', `failed: ${error?.message ?? error}`);
+      console.error(error);
+    }
+  } finally {
+    el('btn-mint').disabled = false;
   }
 }
 
@@ -214,9 +276,13 @@ export async function mountIssuer(state) {
   renderHolders();
   renderCoupons();
 
+  renderMintTargets();
+
   await refreshPolicyState();
   renderHolders();
   renderCoupons();
+  renderMintTargets();
   el('btn-sync').addEventListener('click', syncPolicy);
   el('btn-pay').addEventListener('click', payCycle);
+  el('btn-mint').addEventListener('click', issueTokens);
 }

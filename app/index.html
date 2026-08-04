@@ -71,6 +71,24 @@
     </div>
 
     <div class="panel">
+      <h2>Issue tokens</h2>
+      <p class="hint">
+        The token asks the identity registry before it moves. A holder whose credential
+        has been revoked cannot receive it — the contract refuses, during simulation,
+        before a transaction is built.
+      </p>
+      <div style="margin-top:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+        <select id="mint-to" class="ghost"></select>
+        <input id="mint-amount" class="ghost" type="number" value="100" min="1" step="1"
+               style="width:110px; padding:10px 13px; background:var(--ink); color:var(--vellum);
+                      border:1px solid var(--ink-line); border-radius:4px; font:400 13px var(--mono)">
+        <button class="action" id="btn-mint">Issue</button>
+        <span class="progress" id="mint-progress"></span>
+      </div>
+      <div id="mint-out" style="margin-top:14px"></div>
+    </div>
+
+    <div class="panel">
       <h2>Coupon cycle</h2>
       <p class="hint" id="coupon-terms"></p>
       <table id="coupon-table">
