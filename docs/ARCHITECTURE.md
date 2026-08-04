@@ -132,6 +132,41 @@ The rejection surfaces during **simulation**: standard tooling never submits the
 transaction, so the failure is visible in the wallet and the RPC response rather than as a
 failed transaction on the explorer.
 
+## The bridge, demonstrated
+
+[`scripts/policy-bridge.sh`](../scripts/policy-bridge.sh) reads the registry and moves the
+association sets to match it. Nobody types a key: `verify_identity(holder)` is the question,
+and an allowlist or blocklist insertion is the answer.
+
+The run below is the whole argument, and step 2 is the part that matters.
+
+| Step | Result |
+|---|---|
+| 1. Issuer revokes a holder's KYC claim — **in the identity registry only** | `ClaimRemoved` |
+| 2. **Before syncing**, that holder withdraws from the pool | [succeeds](https://stellar.expert/explorer/testnet/tx/fc26065850fecbd250233b11d6338e73813c5da8802fe5fc8f5ad6956f80d40b) |
+| 3. `policy-bridge.sh sync` | `credential absent → blocklisted (pool balance frozen)` |
+| 4. The same holder tries again | **refused** — *"user note key exists in non-membership tree"* |
+
+Step 2 is why the bridge exists. A permissioned token and a confidential rail each enforce
+their own policy perfectly well, and still disagree: revoking a credential does nothing to
+funds already inside the rail. Without something joining them, an issuer who revokes a
+holder has revoked nothing where the money is.
+
+With the bridge, one credential governs both — and because the pool validates proofs against
+the *current* association roots, the freeze reaches backwards over balances the holder
+already held.
+
+### Enrolment and its trust boundary
+
+An allowlist leaf is `poseidon2(note_public_key, asp_secret)`, and the ASP secret belongs to
+the holder, not the issuer. Enrolment is therefore something a holder *consents to*: handing
+that secret over is what makes them identifiable to the policy operator. In this demo the
+bridge reads it from the rail CLI's local state; a real deployment would collect it during
+onboarding, and the holder would know it had.
+
+The operator remains trusted to mirror the registry faithfully — see the `PolicyBridge`
+contract sketched above, which removes that discretion by making the check happen on-chain.
+
 ## Reference run
 
 The full cycle, executed against the deployment above. Every hash is public.
