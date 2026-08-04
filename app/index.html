@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sigilo — confidential coupon rail</title>
+<link rel="stylesheet" href="css/sigilo.css">
+
+<!--
+  Bare specifier → the vendored SDK. This is load-bearing: the SDK resolves its
+  own worker URLs from import.meta.url, so importing it any other way leaves
+  Client.new without a prover worker.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "stellar-private-payments": "../vendor/spp-sdk-web/js/index.js",
+    "@stellar/stellar-sdk": "./vendor/stellar-sdk.js"
+  }
+}
+</script>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Sigilo</h1>
+    <span class="tag">confidential coupon rail · stellar testnet</span>
+  </div>
+
+  <!--
+    One page, three roles. Not a layout preference: the rail's storage holds an
+    exclusive OPFS lock, so a second tab of this app would evict the first.
+  -->
+  <nav class="roles" role="tablist" aria-label="Role">
+    <button role="tab" data-role="issuer"   aria-selected="true"  aria-controls="panel-issuer">Issuer</button>
+    <button role="tab" data-role="investor" aria-selected="false" aria-controls="panel-investor">Investor</button>
+    <button role="tab" data-role="auditor"  aria-selected="false" aria-controls="panel-auditor">Auditor</button>
+  </nav>
+</header>
+
+<main>
+  <div id="fatal" hidden class="banner"></div>
+
+  <section id="panel-issuer" role="tabpanel" aria-labelledby="tab-issuer">
+    <div class="panel">
+      <h2>Register</h2>
+      <p class="hint" id="issuer-summary">Loading deployment…</p>
+    </div>
+
+    <div class="panel">
+      <h2>Holders &amp; credentials</h2>
+      <table id="issuer-holders">
+        <thead>
+          <tr>
+            <th>Holder</th><th>Position</th><th>Entry</th>
+            <th>Credential</th><th>Rail</th><th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p class="hint" style="margin-top:14px">
+        The registry is the authority. <em>Sync compliance policy</em> makes the rail's
+        association sets follow it — grant puts a holder in the allowlist, revocation
+        puts them in the blocklist and freezes what they already hold.
+      </p>
+      <div style="margin-top:14px; display:flex; gap:10px; align-items:center">
+        <button class="action" id="btn-sync">Sync compliance policy</button>
+        <span class="progress" id="sync-progress"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Coupon cycle</h2>
+      <p class="hint" id="coupon-terms"></p>
+      <table id="coupon-table">
+        <thead>
+          <tr><th>Holder</th><th class="num">Position</th><th class="num">Days</th><th class="num">Coupon</th><th>Status</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div style="margin-top:16px; display:flex; gap:10px; align-items:center">
+        <button class="action" id="btn-pay">Pay coupon cycle</button>
+        <span class="progress" id="pay-progress"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Activity</h2>
+      <div id="issuer-feed" class="hint">No transactions this session.</div>
+    </div>
+  </section>
+
+  <section id="panel-investor" role="tabpanel" hidden>
+    <div class="panel">
+      <h2>Holder</h2>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+        <select id="investor-pick" class="ghost" style="padding:9px"></select>
+        <span class="progress" id="investor-progress"></span>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="panel">
+        <h2>What anyone can see</h2>
+        <dl class="fields" id="investor-public"></dl>
+        <p class="hint" style="margin-top:16px">
+          A securities register should be legible to a regulator, so positions stay public.
+          What the rail hides is the <em>payment flow</em> — the treasury's operation.
+        </p>
+      </div>
+
+      <div class="panel">
+        <h2>What only this holder can see</h2>
+        <div id="investor-private"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Disclose a payment to an auditor</h2>
+      <p class="hint">
+        One payment, chosen by the holder. The circuit needs this note's private key,
+        so nobody else — not even the issuer — can produce this proof.
+      </p>
+      <div id="disclose-notes" style="margin:16px 0"></div>
+      <div style="display:flex; gap:10px; align-items:center">
+        <button class="action" id="btn-disclose" disabled>Generate receipt</button>
+        <span class="progress" id="disclose-progress"></span>
+      </div>
+      <div id="disclose-out" style="margin-top:16px"></div>
+    </div>
+  </section>
+
+  <section id="panel-auditor" role="tabpanel" hidden>
+    <div class="panel">
+      <h2>Receipt</h2>
+      <textarea id="receipt-input" placeholder="Paste a disclosure receipt…" spellcheck="false"></textarea>
+      <div style="margin-top:12px; display:flex; gap:10px; align-items:center">
+        <button class="action" id="btn-verify">Verify</button>
+        <button class="ghost" id="btn-tamper">Tamper with it</button>
+        <span class="progress" id="verify-progress"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Verdict</h2>
+      <div id="verify-out">
+        <p class="empty">
+          Nothing has been disclosed to you. Beyond a receipt someone hands over,
+          this rail shows an auditor nothing — no balances, no counterparties,
+          no other payments.
+        </p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

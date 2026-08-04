@@ -14,3 +14,7 @@ node_modules/
 .DS_Store
 *.log
 .demo-state/
+
+# app build output and deps
+/app/node_modules/
+/app/vendor/
