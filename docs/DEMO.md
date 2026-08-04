@@ -1,0 +1,114 @@
+# Running the demo
+
+Written to be followed by someone who did not build this. Every click is listed, with what to expect and how long it takes.
+
+---
+
+## Before you start
+
+```bash
+export OZ_REPO=/path/to/stellar-contracts
+export SPP_REPO=/path/to/stellar-private-payments
+
+./scripts/reset.sh          # ~2 min — puts everyone back to a clean state
+node app/server.mjs         # leave this running
+```
+
+Open **http://localhost:8080/app/index.html**.
+
+If you ran the demo before, also clear the browser's local data for `localhost:8080` (DevTools → Application → Storage → Clear site data), then reload. The browser keeps its own copy of the wallet, and a stale one shows coupons that were already swept away.
+
+The page opens on the **Issuer** tab. Three tabs across the top — Issuer, Investor, Auditor — are three people looking at the same system. Nothing else is hidden; that is the whole app.
+
+**Expect to wait.** Proving a confidential payment takes about 9 seconds of real computation, and verifying a disclosure about 13. Nothing is frozen. Every action shows what stage it is at.
+
+---
+
+## Act 1 — The token refuses
+
+*The objection this answers: "a regulator will never accept a bearer asset."*
+
+| # | Do this | What happens |
+|---|---|---|
+| 1 | Look at **Holders & credentials** | Five investors, each with a position and a KYC credential. `VALID` / `ALLOWED` across the board |
+| 2 | In **Issue tokens**, pick `inv3`, click **Issue** | ~5s → green `ACCEPTED`. A transaction hash appears under Activity |
+| 3 | Back in the holders table, click **Revoke** on `inv3` | ~8s → the credential turns `REVOKED`. Note the rail column still says `ALLOWED`, with **out of step — sync** beneath it |
+| 4 | Click **Issue** again, still on `inv3` | ~5s → **Refused by the token**, *"the registry knows this address, but its claims no longer verify (#304)"* |
+
+**The point of step 4:** nothing reached the ledger. The contract itself refused, during simulation — this is not the interface declining on the token's behalf. A permissioned asset is one that cannot move to someone who is not allowed to hold it, and that is enforced where it counts.
+
+Leave `inv3` revoked. Act 2 continues from here.
+
+---
+
+## Act 2 — The payment nobody can read, and the gap the bridge closes
+
+*The objections: "every coupon we pay would be public" and "so what if you revoke someone."*
+
+### 2a — Paying
+
+| # | Do this | What happens |
+|---|---|---|
+| 1 | Click **Restore** on `inv3`, then **Sync compliance policy** | ~8s + ~15s → everyone back to `VALID` / `ALLOWED` |
+| 2 | Look at **Coupon cycle** | Five amounts, none proportional to the positions — each accrues from that holder's own entry date |
+| 3 | Click **Pay coupon cycle** | **~75 seconds.** Five confidential payments, each with its own proof. Watch the status column turn `PAID` one by one and the hashes stack up under Activity |
+| 4 | Open any of those hashes on the explorer | An `invoke_host_function` call. **No amount anywhere in it.** Search the page for `119.34` or `287.25` — nothing |
+| 5 | Switch to the **Investor** tab, pick `inv4` | ~10s → `287.25625 XLM — decrypted locally`. The exact number the issuer computed, recovered from the note's ciphertext with this holder's key |
+
+**The contrast on that screen is the argument.** Left column: what anyone can see — the address, the position, the entry date, all public, because a securities register should be legible to a regulator. Right column: what only this holder can see. The position was never secret. The payment always was.
+
+### 2b — Revoke, and watch the gap
+
+| # | Do this | What happens |
+|---|---|---|
+| 1 | Issuer tab → **Revoke** on `inv5` | ~8s → `REVOKED` / `ALLOWED` / **out of step — sync** |
+| 2 | Stop and read that row | The credential is gone from the register. **The rail has not been told.** Right now `inv5` can still spend the coupon they already hold |
+| 3 | Click **Sync compliance policy** | ~15s → the row turns `FROZEN`. Activity shows *"inv5: credential absent → blocklisted (pool balance frozen)"* |
+
+**Step 2 is why this project exists.** A permissioned token and a confidential rail each enforce their own policy perfectly well, and neither knows about the other. Revoking a credential does nothing to money already inside the rail — an issuer who revokes a holder has revoked nothing where it matters. The bridge is what makes the second follow the first.
+
+And the freeze reaches backwards: because the pool checks proofs against the current association roots, a blocklisted holder cannot spend *anything*, including coupons received before the revocation. Re-credentialing lifts it.
+
+---
+
+## Act 3 — Proving one payment, and nothing else
+
+*The objection: "if we cannot see the payments, how does anyone audit this?"*
+
+This is the part that makes confidentiality acceptable rather than suspicious. Hiding payments is easy; the hard part is being able to prove one when someone with the right to ask, asks.
+
+| # | Do this | What happens |
+|---|---|---|
+| 1 | **Investor** tab, pick `inv2` | Their coupon appears, decrypted |
+| 2 | Under **Disclose a payment to an auditor**, select the note | The button enables |
+| 3 | Click **Generate receipt** | **~13s** — a zero-knowledge proof is being built. A receipt appears as JSON |
+| 4 | Click **Send to the auditor tab** | Jumps to the Auditor tab with the receipt pasted in |
+| 5 | Click **Verify** | **~13s** → **Verified**, four checks green |
+| 6 | Read the Disclosed panel | Amount and possession marked **proven**; the coupon reference and authority marked **attested** |
+| 7 | Click **Tamper with it**, then **Verify** again | ~13s → **Refused**, with `Proof: no` and the other three still `yes` |
+
+**What the auditor is for.** They hold no special position — no key, no privileged access, no ability to look around. They can verify only what someone chose to hand them, and that receipt says nothing about any other payment, this holder's balance, or who else was paid in the same cycle. That is what makes the confidentiality legitimate: it is not opacity, it is disclosure the holder controls and an auditor can check.
+
+**Why step 6 matters.** The interface distinguishes what mathematics proves from what a person asserts. The amount is proven. The label *"coupon 2026-H2"* is attested — tamper-evident, but true only because whoever wrote it says so. Overclaiming here is how a system loses a technical audience.
+
+**Why step 7 matters.** One digit of the proof changed, and the verdict flips — while the other three checks still pass, so you can see exactly which guarantee broke. The refusal is as much the demonstration as the success.
+
+---
+
+## When something goes wrong
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| *"Another tab has this demo open"* | The rail keeps one exclusive local database | Close the other tab, reload |
+| The investor shows more coupons than expected | Notes from a previous run | `./scripts/reset.sh`, then clear site data |
+| A payment fails midway | Usually the treasury ran out of pool funding | Check the balance the reset prints; top up with `spp deposit` (100 XLM per deposit) |
+| *"Not yet enrolled in the association set"* | The holder was never synced | Click **Sync compliance policy** |
+| Nothing happens for 15 seconds | Normal — a proof is being computed | Wait. The progress line names the stage |
+
+## Resetting between runs
+
+```bash
+./scripts/reset.sh
+```
+
+Restores revoked credentials, syncs policy, and sweeps coupons back to the treasury — in that order, because syncing after a proof is built invalidates it. Then clear site data in the browser; the script cannot reach the browser's own copy of the wallet.

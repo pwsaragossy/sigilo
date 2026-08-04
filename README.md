@@ -8,6 +8,10 @@ Sigilo pays those coupons through a confidential rail, keeps eligibility governe
 
 > ⚠️ Built for the [Stellar Builder Summit SP 26](https://bounties.grantfox.xyz/events/stellar-summit-sp-2026), Enterprise / Compliance / RWA sub-lane. **Testnet only**, on unaudited alpha dependencies. Not for real value.
 
+**Demo video:** [`docs/video/sigilo-demo.mp4`](docs/video/sigilo-demo.mp4) — 3 minutes, captioned, no narration.
+
+It is a recording of the real interface driven against testnet by [`app/tools/record.mjs`](app/tools/record.mjs): the proofs in it were actually computed, at their real cost, and every scene is checked against the page state before it is captured — a take where the screen disagrees with its caption fails rather than being kept.
+
 ---
 
 ## What is ours, and what is not
@@ -34,7 +38,22 @@ Reproduced on testnet, every hash public.
 
 **An auditor verifies one payment and learns nothing else.** The holder generates a proof for a single coupon; the auditor checks it with no wallet, no storage and no privileged access. Change one digit of the proof and the verdict flips to Refused with `Proof: no`, while the other checks still pass — the interface says which guarantee broke.
 
-Full run with transaction hashes: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#reference-run).
+### The run, with hashes
+
+Every one of these is a public testnet transaction.
+
+| Step | Transaction |
+|---|---|
+| Bridge — grant, allowlist insert | [`03f0676…`](https://stellar.expert/explorer/testnet/tx/03f067603a497e4ad5b5fba17c96610fed716ea95526e0aab530e4b839d23b4b) |
+| Treasury funds the pool | [`fc76008…`](https://stellar.expert/explorer/testnet/tx/fc76008210daf6f64a1e254090a2204bc9850c50f4ea8029fb04267a9d914c02) |
+| Confidential coupon payment | [`649c9d3…`](https://stellar.expert/explorer/testnet/tx/649c9d34848cdd9bfa8736f16e13b471e741c5268d26505a5a7a3a7ee6ffc922) |
+| Bridge — revoke, blocklist insert | [`2811a69…`](https://stellar.expert/explorer/testnet/tx/2811a6976e8bd2218eff9b16ad54c54d1126eeb1d721ea58d14c87294f92d2a8) |
+| **Revoked holder withdraws — before sync** | [`c2f2264…`](https://stellar.expert/explorer/testnet/tx/c2f2264ad3d599dac9f7205c3c987568794d83785a7085dcce39de871805aeeb) |
+| Re-credentialed holder withdraws | [`9cdd967…`](https://stellar.expert/explorer/testnet/tx/9cdd9675894941338fe0e5d053f4304f92622d0c10aa021e1877bc17c9733436) |
+
+The fifth row is the one to open. It is a successful withdrawal by a holder whose credential had already been revoked — the gap the bridge closes. After syncing, the same withdrawal is refused.
+
+Full sequence and enforcement semantics: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#reference-run). Step-by-step walkthrough: [docs/DEMO.md](docs/DEMO.md).
 
 ## What is hidden, and what is not
 

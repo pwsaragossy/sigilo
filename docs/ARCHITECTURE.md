@@ -86,7 +86,9 @@ Confidentiality, not anonymity: addresses transacting with the pool remain visib
 Two paths to an auditor, with different guarantees:
 
 1. **Holder-generated proof.** The recipient proves a specific payment: amount, existence in the pool, and possession — cryptographically verified. The circuit requires the note's private key, so only the holder can produce this.
-2. **Issuer opening-reveal.** The issuer, as creator of the note, hands the auditor its opening (amount, recipient key, blinding); the auditor recomputes the commitment and checks it against the pool. No ZK involved, and it does not depend on the holder cooperating.
+2. **Issuer opening-reveal** — *specified, not implemented.* The issuer creates the note and therefore knows its opening (amount, recipient key, blinding). Handing that to an auditor would let them recompute the commitment and find it in the pool, with no ZK and no dependence on the holder cooperating — which matters, because an audit trail that only works with the auditee's goodwill is not an audit trail.
+
+   What stops it here is narrow: a note commitment is `poseidon2(amount, recipient_key, blinding)`, and the vendored web SDK does not export Poseidon2 to JavaScript. An auditor could only verify by trusting someone else's recomputation, which defeats the purpose. Closing this means exporting the hash from the SDK and rebuilding it — mechanical, but not free.
 
 The auditor interface labels each field **proven** or **attested**. Coupon references travel in a tamper-evident context field whose *contents* are asserted by the prover — that distinction is surfaced, not hidden.
 
@@ -126,7 +128,8 @@ entry date, so a coupon is not a fixed fraction of a (publicly readable) balance
 | Attempt | Result |
 |---|---|
 | `transfer` between two credentialed holders | [confirmed](https://stellar.expert/explorer/testnet/tx/1a0023ce550b28b267f5f0ee9ab7e92a16f4b50bdfc5db0f55075da7c8002308) |
-| `transfer` to an address with no KYC claim | **rejected** — `Error(Contract, #321)` `IdentityNotFound`, raised by `verify_identity` |
+| Issuing to an address the registry has never seen | **rejected** — `Error(Contract, #321)` `IdentityNotFound` |
+| Issuing to a holder whose credential was revoked | **rejected** — `Error(Contract, #304)` `IdentityVerificationFailed` |
 
 The rejection surfaces during **simulation**: standard tooling never submits the
 transaction, so the failure is visible in the wallet and the RPC response rather than as a
