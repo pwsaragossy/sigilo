@@ -114,8 +114,8 @@ Seven-contract ERC-3643 stack, deployed by [`scripts/deploy-rwa.sh`](../scripts/
 | Identity registry | `CCO2EI7P325L2OAR4NQHPUO25AXYBTMPC7DI6JSW5BTPGPCKA27J33SK` |
 | Identity verifier | `CARCZ47PIRP2JCN3VEJ42UIWTWZ7SGKM764ZH554P3O2ODXI7P4VMKT6` |
 | Compliance | `CA4EI7P5TO4Y2FAGX3QT7WB3OQL2VP3BQ7CQUUZRQZRN5GCW76LH2M7N` |
-| Claim topics & issuers | `CC4EK5WXC5BRK464AQSMBMQFRFQIS3IWLBTAF7KL3CEVA3JJYL53OG47` |
-| Claim issuer | `CDBVWZMFQHZXY3D5JI2PS5OCE3T4GRUUYKU56OOWMYLPGSTQQHGXPCXD` |
+| Claim topics & issuers | `CDOW2IOHRHGNHASQDKPO3VJJAIPDTZOUCGWCM4EFVNOWSWS7YN5VWS2X` |
+| Claim issuer | `CA7N55KMS4Y3MPUATH5ECWVUTRD3V3CQNM2B5RP7XDRUAFL5T6FNAIGG` |
 
 Five holders, each with a per-investor identity contract carrying Ed25519-signed KYC and
 AML claims. Positions are uneven and entry dates differ — coupons accrue per day from the
