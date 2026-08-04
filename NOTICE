@@ -1,0 +1,15 @@
+Sigilo
+Copyright 2026 Pedro Saragossy
+
+This product includes software developed by third parties:
+
+- stellar-private-payments (https://github.com/NethermindEth/stellar-private-payments)
+  Copyright Nethermind. Licensed under the Apache License, Version 2.0.
+  Pinned at commit 461c1d0e9b5cc6d3e0485c43d8a41f26ab1710e1.
+  Used for: privacy pool contracts, Circom circuits, ASP registries,
+  web SDK (rebuilt from source against our own testnet deployment), CLI.
+
+- OpenZeppelin Contracts for Stellar (https://github.com/OpenZeppelin/stellar-contracts)
+  Copyright OpenZeppelin. Licensed under the Apache License, Version 2.0.
+  Pinned at commit 9b5ed96f67aa28a8be73c538f7bfdef65925c6bc.
+  Used for: RWA (ERC-3643/T-REX) token suite, access control.

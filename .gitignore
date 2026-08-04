@@ -1,0 +1,17 @@
+# deps / build
+node_modules/
+target/
+dist/
+*.wasm
+!vendor/**/*.wasm
+
+# env & secrets — demo keys are seed-generated and disposable, never committed
+.env
+.env.*
+*.key
+*.secret
+
+# local state
+.DS_Store
+*.log
+.demo-state/
