@@ -1,9 +1,8 @@
-# deps / build
+# deps / build (scoped so the vendored SDK below is not swallowed)
 node_modules/
-target/
-dist/
-*.wasm
-!vendor/**/*.wasm
+/target/
+/app/dist/
+/web/dist/
 
 # env & secrets — demo keys are seed-generated and disposable, never committed
 .env
