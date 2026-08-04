@@ -65,6 +65,32 @@ async function handleCredential(req, res) {
   }
 }
 
+/**
+ * The real state of both systems, read from the chain.
+ *
+ * The bridge's `status` already asks the register and the association sets
+ * separately, which is exactly the distinction the issuer view has to show —
+ * inferring it from local files would hide a divergence instead of exposing it.
+ */
+async function handleStatus(_req, res) {
+  if (!env.SPP_REPO) return json(res, 500, { error: 'SPP_REPO is not set' });
+  try {
+    const { stdout } = await run(resolve(ROOT, 'scripts/policy-bridge.sh'), ['status'], { env });
+    const holders = {};
+    for (const line of stdout.split('\n')) {
+      const m = line.trim().match(/^(inv[1-9])\s+(yes|no)\s+(true|false)\s+(yes|no)$/);
+      if (m) holders[m[1]] = {
+        credentialValid: m[2] === 'yes',
+        allowlisted: m[3] === 'true',
+        railBlocked: m[4] === 'yes',
+      };
+    }
+    return json(res, 200, { holders });
+  } catch (error) {
+    return json(res, 500, { error: (error.stderr || error.message).trim() });
+  }
+}
+
 async function handleSync(_req, res) {
   if (!env.SPP_REPO) return json(res, 500, { error: 'SPP_REPO is not set' });
   try {
@@ -107,6 +133,7 @@ createServer(async (req, res) => {
   try {
     if (req.method === 'POST' && req.url === '/api/credential') return await handleCredential(req, res);
     if (req.method === 'POST' && req.url === '/api/sync') return await handleSync(req, res);
+    if (req.method === 'GET' && req.url === '/api/status') return await handleStatus(req, res);
     return await serveStatic(req, res);
   } catch (error) {
     json(res, 500, { error: String(error?.message ?? error) });

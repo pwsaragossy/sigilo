@@ -46,13 +46,16 @@ function renderHolders() {
       <td>${h.name}<div class="mono-sm">${short(h.address, 8, 6)}</div></td>
       <td class="num">${fmt(h.position, 0)}</td>
       <td>${h.entryDate}</td>
-      <td>${h.blocked
-        ? '<span class="badge bad">revoked</span>'
-        : '<span class="badge ok">valid</span>'}</td>
-      <td>${h.blocked
+      <td>${h.credentialValid
+        ? '<span class="badge ok">valid</span>'
+        : '<span class="badge bad">revoked</span>'}</td>
+      <td>${h.railBlocked
         ? '<span class="badge bad">frozen</span>'
-        : (h.allowlisted ? '<span class="badge ok">allowed</span>' : '<span class="badge public">pending</span>')}</td>
-      <td><button class="ghost" data-revoke="${h.name}">${h.blocked ? 'Restore' : 'Revoke'}</button></td>
+        : (h.allowlisted ? '<span class="badge ok">allowed</span>' : '<span class="badge public">pending</span>')}
+        ${h.credentialValid === h.railBlocked
+          ? '<div class="mono-sm" style="color:var(--seal)">out of step — sync</div>'
+          : ''}</td>
+      <td><button class="ghost" data-revoke="${h.name}">${h.credentialValid ? 'Revoke' : 'Restore'}</button></td>
     </tr>`).join('');
 
   el('issuer-holders').querySelectorAll('[data-revoke]').forEach((btn) => {
@@ -73,9 +76,9 @@ function renderCoupons() {
       <td class="num">${fmt(h.position, 0)}</td>
       <td class="num">${days}</td>
       <td class="num">${fmt(amount)}</td>
-      <td>${h.blocked
-        ? '<span class="badge bad">held back</span>'
-        : '<span class="badge public">due</span>'}</td>
+      <td>${h.credentialValid
+        ? '<span class="badge public">due</span>'
+        : '<span class="badge bad">held back</span>'}</td>
     </tr>`;
   }).join('');
 }
@@ -88,26 +91,28 @@ function renderCoupons() {
  */
 async function toggleCredential(name) {
   const holder = demo.holders.find((h) => h.name === name);
-  setProgress('sync-progress', `${holder.blocked ? 'restoring' : 'revoking'} ${name}'s credential…`, 'register');
+  const revoking = holder.credentialValid;
+  setProgress('sync-progress', `${revoking ? 'revoking' : 'restoring'} ${name}'s credential…`, 'register');
 
   try {
     const res = await fetch('/api/credential', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ holder: name, action: holder.blocked ? 'grant' : 'revoke' }),
+      body: JSON.stringify({ holder: name, action: revoking ? 'revoke' : 'grant' }),
     });
     const out = await res.json();
     if (!res.ok) throw new Error(out.error ?? 'failed');
 
-    holder.blocked = !holder.blocked;
+    // Only the register changed. The rail keeps enforcing whatever its
+    // association sets last said, which is why railBlocked is untouched here.
+    holder.credentialValid = !revoking;
     renderHolders();
     renderCoupons();
-    if (out.hash) pushFeed(`${holder.blocked ? 'revoked' : 'restored'} ${name}`, out.hash);
+    if (out.hash) pushFeed(`${revoking ? 'revoked' : 'restored'} ${name}`, out.hash);
 
-    setProgress('sync-progress',
-      holder.blocked
-        ? 'register updated — the rail still allows this holder to spend until you sync'
-        : 'register updated — sync to lift the freeze');
+    setProgress('sync-progress', revoking
+      ? 'register updated — the rail still lets this holder spend until you sync'
+      : 'register updated — sync to lift the freeze');
   } catch (error) {
     setProgress('sync-progress', `failed: ${error?.message ?? error}`);
   }
@@ -122,6 +127,10 @@ async function syncPolicy() {
     const res = await fetch('/api/sync', { method: 'POST' });
     const out = await res.json();
     if (!res.ok) throw new Error(out.error ?? 'failed');
+
+    // The rail now agrees with the register.
+    for (const h of demo.holders) h.railBlocked = !h.credentialValid;
+    renderHolders();
 
     for (const line of out.changes ?? []) pushFeed(line, out.hash ?? '');
     setProgress('sync-progress', out.changes?.length
@@ -144,7 +153,10 @@ async function payCycle() {
     const account = await openAccount(demo.treasury.address, signer, NETWORK_PASSPHRASE);
     const pool = await openPool(account, demo.rail.pool);
 
-    const due = demo.holders.filter((h) => !h.blocked);
+    // Eligibility follows the register: an uncredentialed holder is skipped by
+    // the issuer's own policy. The rail would let the payment through — it only
+    // gates spending — so this exclusion is a service decision, not enforcement.
+    const due = demo.holders.filter((h) => h.credentialValid);
     let paid = 0;
 
     for (const holder of due) {
@@ -177,9 +189,32 @@ async function payCycle() {
   }
 }
 
+/**
+ * Reads both systems from the chain rather than trusting local files, so a
+ * divergence between the register and the rail shows up instead of being
+ * papered over.
+ */
+async function refreshPolicyState() {
+  try {
+    const res = await fetch('/api/status');
+    const out = await res.json();
+    if (!res.ok) return;
+    for (const holder of demo.holders) {
+      const live = out.holders?.[holder.name];
+      if (live) Object.assign(holder, live);
+    }
+  } catch {
+    // Falls back to the seed's view; the badges stay honest either way.
+  }
+}
+
 export async function mountIssuer(state) {
   demo = state ?? (await loadDemoState());
   renderSummary();
+  renderHolders();
+  renderCoupons();
+
+  await refreshPolicyState();
   renderHolders();
   renderCoupons();
   el('btn-sync').addEventListener('click', syncPolicy);

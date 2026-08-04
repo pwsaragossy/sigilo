@@ -53,12 +53,18 @@ export async function loadDemoState() {
       aspNonMembership: rail.asp_non_membership,
       registry: rail.public_key_registry,
     },
+    // Two states, deliberately kept apart: the credential lives in the identity
+    // register, the freeze lives in the rail's association sets. They agree only
+    // after a sync, and the gap between them is the whole point of the bridge —
+    // collapsing them into one field would make the UI claim a freeze that has
+    // not happened yet.
     holders: rwa.holders.map((h) => ({
       ...h,
       secret: keys[h.name]?.secret,
       // `blocked` is only written once a holder has actually been blocked,
       // so absent means "not blocked", not "unknown".
-      blocked: policy[h.name]?.blocked === 'true',
+      credentialValid: policy[h.name]?.blocked !== 'true',
+      railBlocked: policy[h.name]?.blocked === 'true',
       allowlisted: policy[h.name]?.allowlisted === 'true',
       noteKey: policy[h.name]?.note_key,
     })),
