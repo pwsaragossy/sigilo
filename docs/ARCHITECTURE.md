@@ -103,3 +103,22 @@ Own instance — the reference deployment's association sets are admin-gated by 
 | Public key registry | `CBJKSJGUAN7SAJ5ZBAL6K3VWHV7YD6PYTWSOEG2G43ZPMVEK4GV23ELJ` |
 
 Deployed at ledger 3958947. Trees: 10 levels. Proofs: Groth16 over BN254, verified on-chain through native host functions (CAP-0074, CAP-0080).
+
+## Reference run
+
+The full cycle, executed against the deployment above. Every hash is public.
+
+| Step | Result | Transaction |
+|---|---|---|
+| Bridge — grant (allowlist insert ×2) | `LeafAdded` idx 0, 1 | [`03f0676…`](https://stellar.expert/explorer/testnet/tx/03f067603a497e4ad5b5fba17c96610fed716ea95526e0aab530e4b839d23b4b) · [`80049d1…`](https://stellar.expert/explorer/testnet/tx/80049d16457ec86d15752babe7cf8828ca5923ac1d7f6c619718ec9e464034ea) |
+| Treasury funds the pool (100 XLM) | confirmed, 10.2 s | [`fc76008…`](https://stellar.expert/explorer/testnet/tx/fc76008210daf6f64a1e254090a2204bc9850c50f4ea8029fb04267a9d914c02) |
+| Confidential coupon payment (12.34 XLM) | confirmed, 12.2 s | [`649c9d3…`](https://stellar.expert/explorer/testnet/tx/649c9d34848cdd9bfa8736f16e13b471e741c5268d26505a5a7a3a7ee6ffc922) |
+| Recipient decrypts own balance | `12.34 XLM`, locally | — |
+| Bridge — revoke (blocklist insert) | `LeafInserted` | [`2811a69…`](https://stellar.expert/explorer/testnet/tx/2811a6976e8bd2218eff9b16ad54c54d1126eeb1d721ea58d14c87294f92d2a8) |
+| **Revoked holder attempts withdrawal** | **blocked** — *"user note key exists in non-membership tree"* | — |
+| Bridge — re-grant (blocklist delete) | `LeafDeleted` | confirmed |
+| Re-credentialed holder withdraws (5 XLM) | confirmed, 15.2 s | [`9cdd967…`](https://stellar.expert/explorer/testnet/tx/9cdd9675894941338fe0e5d053f4304f92622d0c10aa021e1877bc17c9733436) |
+
+The amounts above appear in this table because we chose to publish them. They are not readable from the pool transactions themselves.
+
+Proving takes roughly 9 s of CPU per operation. The revocation block surfaces client-side, when the wallet assembles its proof context — the association-set check fails before a transaction is ever built.
