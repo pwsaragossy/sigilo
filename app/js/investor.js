@@ -99,7 +99,14 @@ function renderNoteChoices(notes) {
   });
 }
 
-async function selectHolder(name) {
+/**
+ * Opens a holder's wallet.
+ *
+ * `announce` moves the lifecycle marker to this step, and the initial mount passes
+ * false: warming the panel on page load is not the holder doing anything, and a bar
+ * that opens on "Holder decrypts" claims a place in the cycle nobody reached.
+ */
+async function selectHolder(name, { announce = true } = {}) {
   const holder = demo.holders.find((h) => h.name === name);
   renderPublic(holder);
   el('investor-private').innerHTML = '<p class="hint">Opening wallet…</p>';
@@ -113,7 +120,7 @@ async function selectHolder(name) {
   current = { holder, account, pool, notes };
   // Only a decrypted note proves the holder actually received one.
   if (notes.length) flow.done('receive');
-  flow.at('receive');
+  if (announce) flow.at('receive');
   renderPrivate(notes);
   renderNoteChoices(notes);
   setProgress('');
@@ -184,5 +191,5 @@ export async function mountInvestor(state) {
 
   el('btn-disclose').addEventListener('click', generateReceipt);
 
-  await selectHolder(demo.holders[0].name);
+  await selectHolder(demo.holders[0].name, { announce: false });
 }
