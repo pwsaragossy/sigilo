@@ -16,7 +16,7 @@ node app/server.mjs         # leave this running
 
 Open **http://localhost:8080/app/index.html**.
 
-If you ran the demo before, also clear the browser's local data for `localhost:8080` (DevTools → Application → Storage → Clear site data), then reload. The browser keeps its own copy of the wallet, and a stale one shows coupons that were already swept away.
+If you ran the demo before, also clear the browser's local data for `localhost:8080` (DevTools → Application → Storage → Clear site data), then reload. The browser keeps its own copy of the wallet, and a stale one shows a balance that was already swept away. It does not hide history: note state is rebuilt from the chain, so earlier coupons reappear — marked `spent`, which is what they are.
 
 The page opens on the **Issuer** tab. Three tabs across the top — Issuer, Investor, Auditor — are three people looking at the same system. Nothing else is hidden; that is the whole app.
 
@@ -100,8 +100,9 @@ This is the part that makes confidentiality acceptable rather than suspicious. H
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| *"Another tab has this demo open"* | The rail keeps one exclusive local database | Close the other tab, reload |
-| The investor shows more coupons than expected | Notes from a previous run | `./scripts/reset.sh`, then clear site data |
+| *"failed to load prover: operation timed out"*, on the first load | Cold start: storage rebuilds note state from the chain while the prover compiles 21 MB of wasm, and together they exceed the SDK's 30s budget | **Reload.** The second load finds both warm and starts clean |
+| *"Another tab has this demo open"* | The confidential payment SDK keeps one exclusive local database | Close the other tab, reload |
+| The investor shows coupons from earlier runs | Note state is rebuilt from the chain, so `reset.sh` spends those coupons rather than erasing them — clearing site data brings them straight back | Expected, and they read `spent`. A genuinely empty history needs a fresh deployment |
 | A payment fails midway | Usually the treasury ran out of pool funding | Check the balance the reset prints; top up with `spp deposit` (100 XLM per deposit) |
 | *"Not yet enrolled in the allow-list"* | The holder was never synced | Click **Sync policy** |
 | Nothing happens for 15 seconds | Normal — a proof is being computed | Wait. The progress line names the stage |
@@ -113,3 +114,5 @@ This is the part that makes confidentiality acceptable rather than suspicious. H
 ```
 
 Restores revoked credentials, syncs policy, and sweeps coupons back to the treasury — in that order, because syncing after a proof is built invalidates it. Then clear site data in the browser; the script cannot reach the browser's own copy of the wallet.
+
+Sweeping spends the coupons, it does not erase them, and no browser-side reset will: they are on-chain history for that holder. A run that starts from an empty ledger of payments needs a fresh deployment, not a fresh browser.
