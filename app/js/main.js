@@ -11,7 +11,7 @@ const fatal = document.getElementById('fatal');
 function die(error) {
   fatal.hidden = false;
   fatal.textContent = isDbLocked(error)
-    ? 'Another tab has this demo open. The rail keeps one exclusive local database, so close the other tab and reload.'
+    ? 'Another tab has this demo open. The confidential payment SDK keeps one exclusive local database, so close the other tab and reload.'
     : `Could not start: ${error?.message ?? error}`;
   console.error(error);
 }

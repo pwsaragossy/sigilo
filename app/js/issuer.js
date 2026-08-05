@@ -94,10 +94,11 @@ function renderBridge() {
   el('bridge-enforcer').innerHTML = demo.policyBridge
     ? `Enforced on-chain by
        <a href="${contractUrl(demo.policyBridge)}" target="_blank" rel="noopener">${short(demo.policyBridge, 8, 6)}</a>,
-       which owns both association sets and consults the register before moving either.
-       The issuer cannot reach them directly — <em>the contract has no private key</em>.`
+       which owns both the allow-list and the blocklist and consults the identity registry
+       before moving either. The issuer cannot reach them directly —
+       <em>the contract has no private key</em>.`
     : `Kept in step by an off-chain service. Nothing on-chain compels it to mirror the
-       register faithfully — deploy the PolicyBridge contract to remove that trust.`;
+       registry faithfully — deploy the PolicyBridge contract to remove that trust.`;
 
   el('bridge-link').toggleAttribute('data-broken', broken.length > 0);
 
@@ -157,7 +158,7 @@ async function toggleCredential(name) {
     if (out.hash) pushFeed(`${revoking ? 'revoked' : 'restored'} ${name}`, out.hash);
 
     setProgress('sync-progress', revoking
-      ? 'register updated — the rail still lets this holder spend until you sync'
+      ? 'register updated — the payment side still lets this holder spend until you sync'
       : 'register updated — sync to lift the freeze');
   } catch (error) {
     setProgress('sync-progress', `failed: ${error?.message ?? error}`);
@@ -167,7 +168,7 @@ async function toggleCredential(name) {
 /** Pushes the register's decisions into the rail's association sets. */
 async function syncPolicy() {
   el('btn-sync').disabled = true;
-  setProgress('sync-progress', 'reading the registry and moving the association sets…', 'sync');
+  setProgress('sync-progress', 'reading the registry and moving the allow-list and blocklist…', 'sync');
 
   try {
     const res = await fetch('/api/sync', { method: 'POST' });
@@ -182,7 +183,7 @@ async function syncPolicy() {
     for (const line of out.changes ?? []) pushFeed(line, out.hash ?? '');
     setProgress('sync-progress', out.changes?.length
       ? `${out.changes.length} change(s) applied — proofs built against the old roots are now void`
-      : 'association sets already match the registry');
+      : 'allow-list and blocklist already match the registry');
   } catch (error) {
     setProgress('sync-progress', `failed: ${error?.message ?? error}`);
   } finally {
@@ -272,7 +273,7 @@ async function proveTheGap() {
 
     const balance = await pool.balance();
     if (!balance || balance <= 0n) {
-      el('prove-out').innerHTML = `<p class="hint">${name} holds nothing in the rail right
+      el('prove-out').innerHTML = `<p class="hint">${name} holds nothing in the pool right
         now — run a coupon cycle first and the gap becomes spendable money.</p>`;
       return;
     }
@@ -280,12 +281,12 @@ async function proveTheGap() {
     const amount = balance < 50_000_000n ? balance : 50_000_000n;   // up to 5 XLM
     const outcome = describeResult(await pool.withdraw(amount));
 
-    for (const hash of outcome.hashes) pushFeed(`${name} withdrew from the rail`, hash);
+    for (const hash of outcome.hashes) pushFeed(`${name} withdrew from the pool`, hash);
 
     el('prove-out').innerHTML = outcome.ok
       ? `<p style="font:400 19px/1.3 var(--serif); color:var(--refused); margin:0 0 8px">
            ${name} just took the money out.</p>
-         <p class="hint">Revoked in the register, never told to the rail. Sync and try again.</p>`
+         <p class="hint">Revoked in the register, never told to the payment side. Sync and try again.</p>`
       : `<p class="hint"><span class="badge ok">refused</span> ${outcome.message}</p>
          <p class="hint" style="margin-top:8px">The freeze reaches back over coupons
            received before the revocation.</p>`;

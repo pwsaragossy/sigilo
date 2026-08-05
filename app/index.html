@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sigilo — confidential coupon rail</title>
+<title>Sigilo — policy-gated confidential coupon payments</title>
 <link rel="stylesheet" href="css/sigilo.css">
 
 <!--
@@ -25,7 +25,7 @@
 <header>
   <div class="brand">
     <h1>Sigilo</h1>
-    <span class="tag">confidential coupon rail · stellar testnet</span>
+    <span class="tag">policy-gated confidential coupon payments · stellar testnet</span>
   </div>
 
   <!--
@@ -47,8 +47,8 @@
 <nav class="flow" aria-label="Lifecycle">
   <ol>
     <li data-step="credential"><span class="n">1</span><span class="what">Credential issued</span><span class="who">identity register</span></li>
-    <li data-step="policy"><span class="n">2</span><span class="what">Policy synced</span><span class="who">the bridge</span></li>
-    <li data-step="pay"><span class="n">3</span><span class="what">Coupon paid</span><span class="who">confidential rail</span></li>
+    <li data-step="policy"><span class="n">2</span><span class="what">Policy synced</span><span class="who">on-chain policy gate</span></li>
+    <li data-step="pay"><span class="n">3</span><span class="what">Coupon paid</span><span class="who">confidential payment</span></li>
     <li data-step="receive"><span class="n">4</span><span class="what">Holder decrypts</span><span class="who">holder's key</span></li>
     <li data-step="prove"><span class="n">5</span><span class="what">Auditor verifies</span><span class="who">zero-knowledge proof</span></li>
   </ol>
@@ -70,7 +70,7 @@
       side on their own row, which is the thing a second table could never show.
     -->
     <div class="panel bridge">
-      <h2>Policy — one credential, two systems</h2>
+      <h2>Policy enforcement — one credential, two places it binds</h2>
       <div class="hint" id="bridge-enforcer" style="margin:-6px 0 18px"></div>
 
       <table id="issuer-holders">
@@ -83,8 +83,8 @@
             </th>
             <th><div class="link" id="bridge-link" aria-hidden="true"></div></th>
             <th scope="colgroup">
-              Confidential rail
-              <div class="side-sub">who may move money inside it</div>
+              Confidential payments
+              <div class="side-sub">who may move money inside them</div>
             </th>
             <td></td>
           </tr>
@@ -120,7 +120,7 @@
 
     <div class="panel">
       <h2>Coupon cycle</h2>
-      <p class="hint">Paid through the confidential rail — no amount reaches the ledger.</p>
+      <p class="hint">Paid confidentially — no amount reaches the ledger.</p>
       <p class="hint" id="coupon-terms"></p>
       <table id="coupon-table">
         <thead>
@@ -165,7 +165,7 @@
     </div>
 
     <div class="panel">
-      <h2>Disclose a payment to an auditor</h2>
+      <h2>Selective disclosure</h2>
       <p class="hint">
         One payment, chosen by the holder. The circuit needs this note's private key —
         not even the issuer can produce this proof.

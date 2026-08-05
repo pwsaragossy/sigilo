@@ -54,7 +54,7 @@ export async function initRuntime(rpcUrl) {
 }
 
 export function client() {
-  if (!clientHandle) throw new Error('Rail runtime not started.');
+  if (!clientHandle) throw new Error('Confidential payment runtime not started.');
   return clientHandle;
 }
 
@@ -87,7 +87,7 @@ export async function pool(account, poolContract) {
 export async function resolveRecipient(address) {
   const lookup = await client().recipientLookup(address);
   if (!lookup?.entry) {
-    throw new Error(`${address.slice(0, 8)}… has not registered rail keys yet`);
+    throw new Error(`${address.slice(0, 8)}… has not registered payment keys yet`);
   }
   return lookup.entry;
 }
@@ -121,7 +121,7 @@ export function onProgress(flow, handler) {
 export function describeResult(result) {
   if (result?.status === 'ok') return { ok: true, hashes: result.hashes ?? [] };
   if (result?.status === 'aspNotReady') {
-    return { ok: false, hashes: [], message: 'Not yet enrolled in the association set.' };
+    return { ok: false, hashes: [], message: 'Not yet enrolled in the allow-list.' };
   }
   return {
     ok: false,

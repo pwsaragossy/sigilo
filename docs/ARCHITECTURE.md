@@ -8,33 +8,9 @@ On a public ledger, every coupon payment an issuer makes is a published treasury
 
 One identity policy governs two enforcement points:
 
-```
-                    ┌──────────────────────────┐
-                    │   Identity Registry      │
-                    │   (ERC-3643 / T-REX)     │
-                    │   KYC claims per holder  │
-                    └───────────┬──────────────┘
-                                │
-              ┌─────────────────┴──────────────────┐
-              │                                    │
-    ┌─────────▼──────────┐            ┌────────────▼─────────────┐
-    │  Permissioned      │            │  Policy Bridge           │
-    │  token (RWA)       │            │  (this project)          │
-    │                    │            │                          │
-    │  can_transfer()    │            │  grant  → allowlist ins. │
-    │  rejects           │            │  revoke → blocklist ins. │
-    │  uncredentialed    │            └────────────┬─────────────┘
-    └────────────────────┘                         │
-                                       ┌───────────▼──────────────┐
-                                       │  Confidential rail       │
-                                       │  (privacy pool + ASP)    │
-                                       │                          │
-                                       │  proofs bind spender to  │
-                                       │  the association sets    │
-                                       └──────────────────────────┘
-```
+![One identity policy, two enforcement points](img/policy-gate.svg)
 
-The permissioned token enforces **who may hold**. The confidential rail enforces **who may spend**. The bridge keeps both governed by the same KYC source.
+The permissioned token enforces **who may hold**. The confidential payment pool enforces **who may spend**. The policy gate keeps both governed by the same KYC source — and, because it owns the lists outright, keeps the issuer from reaching either one directly.
 
 ## Enforcement semantics (verified against the pool implementation)
 

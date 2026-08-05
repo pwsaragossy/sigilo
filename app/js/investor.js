@@ -143,7 +143,7 @@ async function generateReceipt() {
     // Returns null rather than throwing when the holder is not in the association set.
     if (!receipt) {
       el('disclose-out').innerHTML = `<p class="hint">This holder is not currently
-        enrolled in the association set, so no proof can be produced.</p>`;
+        enrolled in the allow-list, so no proof can be produced.</p>`;
       return;
     }
 

@@ -103,7 +103,7 @@ This is the part that makes confidentiality acceptable rather than suspicious. H
 | *"Another tab has this demo open"* | The rail keeps one exclusive local database | Close the other tab, reload |
 | The investor shows more coupons than expected | Notes from a previous run | `./scripts/reset.sh`, then clear site data |
 | A payment fails midway | Usually the treasury ran out of pool funding | Check the balance the reset prints; top up with `spp deposit` (100 XLM per deposit) |
-| *"Not yet enrolled in the association set"* | The holder was never synced | Click **Sync policy** |
+| *"Not yet enrolled in the allow-list"* | The holder was never synced | Click **Sync policy** |
 | Nothing happens for 15 seconds | Normal — a proof is being computed | Wait. The progress line names the stage |
 
 ## Resetting between runs
