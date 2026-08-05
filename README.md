@@ -84,7 +84,47 @@ Two more limits worth stating plainly:
 
 **Enrolment needs the holder's consent.** An allow-list leaf commits to the holder's ASP secret, which is theirs. Handing it over is what makes them identifiable to the policy operator; the demo takes it from the CLI's local state, a real deployment would collect it during onboarding.
 
-## Running it
+## Using it in your own deployment
+
+The reusable piece is [`contracts/policy-bridge`](contracts/policy-bridge) — one Soroban contract, 203 lines. Everything else in this repository exists to demonstrate it.
+
+**What you need already.** The contract does not deploy an identity registry or a confidential pool; it binds two you already run. It calls them by name, so yours must expose these:
+
+| Component | What the contract calls |
+|---|---|
+| Identity verifier (ERC-3643 / OZ RWA) | `verify_identity(address)` — reports failure by trapping, which is read as *not credentialed* |
+| Allow-list (ASP membership) | `insert_leaf(leaf)`, plus `update_admin(new_admin)` once |
+| Blocklist (ASP non-membership) | `insert_leaf(key, value)` to freeze, `delete_leaf(key)` to lift, plus `update_admin(new_admin)` once |
+
+**Deploy it** with the four addresses it will govern:
+
+```bash
+stellar contract deploy --wasm policy_bridge.wasm \
+  -- --operator <your issuer key> --verifier <identity verifier> \
+     --allowlist <asp membership> --blocklist <asp non-membership>
+```
+
+**Then hand over both trees — this is the step that matters.** Until the association sets name the contract as their admin, the operator can still write to them directly and every guarantee below is decorative:
+
+```bash
+stellar contract invoke --id <allowlist> -- update_admin --new_admin <bridge>
+stellar contract invoke --id <blocklist> -- update_admin --new_admin <bridge>
+```
+
+**Verify you locked yourself out.** Try to write to a tree directly; the network should refuse you, because the contract that now owns it has no private key:
+
+```bash
+stellar contract invoke --id <allowlist> --source <issuer> -- insert_leaf --leaf 1
+# error: Missing signing key for account C…
+```
+
+[`scripts/deploy-bridge.sh`](scripts/deploy-bridge.sh) does all four steps and ends with that check, printing a warning if the handover did not take.
+
+**From then on**, `grant(holder, leaf)`, `revoke(holder, note_key)` and `restore(holder, note_key)` replace every direct write. Each asks the registry first and refuses to contradict it — `grant` fails with `NotCredentialed` (#2), `revoke` fails with `StillCredentialed` (#3). `is_credentialed(holder)` is a public read, so anyone can check the decision the contract acted on, and every call emits a `PolicyChanged` event, so an auditor reconstructs who was enrolled or frozen and when without asking you.
+
+**The honest limit on portability.** Those function names and arities are how the contract talks to its neighbours, and they match Nethermind's ASP contracts and OpenZeppelin's verifier at the pinned commits. Different components mean editing those call sites — the pattern transfers, the exact invocations may not. And this is testnet work on unaudited alpha dependencies: adopt the design, not this build, for anything holding real value.
+
+## Running the demo
 
 Needs the Stellar CLI, Rust, Node 22+, `jq`, and clones of the two upstream repositories at the pinned commits.
 
