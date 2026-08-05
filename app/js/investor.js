@@ -10,6 +10,7 @@ import {
 } from './demo-state.js';
 import { openAccount, pool as openPool, onProgress, client } from './sdk-facade.js';
 import { LocalSigner } from './local-signer.js';
+import * as flow from './flow.js';
 
 const el = (id) => document.getElementById(id);
 const pick = () => el('investor-pick');
@@ -32,9 +33,9 @@ function renderPublic(holder) {
     <dt>Token</dt><dd><a href="${contractUrl(demo.token.contract)}" target="_blank" rel="noopener">${demo.token.symbol}</a></dd>
     <dt>Position</dt><dd>${fmt(holder.position, 0)} <span class="badge public">public</span></dd>
     <dt>Entered</dt><dd>${holder.entryDate} <span class="badge public">public</span></dd>
-    <dt>Credential</dt><dd>${holder.blocked
-      ? '<span class="badge bad">revoked</span>'
-      : '<span class="badge ok">valid</span>'}</dd>
+    <dt>Credential</dt><dd>${holder.credentialValid
+      ? '<span class="badge ok">valid</span>'
+      : '<span class="badge bad">revoked</span>'}</dd>
     <dt>Coupon paid</dt><dd><span class="sealed">—————</span> <span class="hint">not readable on-chain</span></dd>
     <dt title="what an observer could still infer">Accrual</dt>
     <dd class="hint">${days} days at ${COUPON.annualRatePct}% — computable only if the rate is known</dd>
@@ -111,6 +112,9 @@ async function selectHolder(name) {
   const notes = await pool.notes();
 
   current = { holder, account, pool, notes };
+  // Only a decrypted note proves the holder actually received one.
+  if (notes.length) flow.done('receive');
+  flow.at('receive');
   renderPrivate(notes);
   renderNoteChoices(notes);
   setProgress('');
@@ -119,6 +123,7 @@ async function selectHolder(name) {
 async function generateReceipt() {
   if (!current || !selectedNote) return;
 
+  flow.at('prove');
   const stop = onProgress('disclose', (d) => setProgress(d.message, d.stage));
   el('btn-disclose').disabled = true;
 

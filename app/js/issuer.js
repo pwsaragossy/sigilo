@@ -14,6 +14,7 @@ import {
 } from './sdk-facade.js';
 import { LocalSigner } from './local-signer.js';
 import { mint, PolicyRefusal } from './token.js';
+import * as flow from './flow.js';
 
 const el = (id) => document.getElementById(id);
 let demo;
@@ -41,6 +42,9 @@ function renderSummary() {
     (<a href="${contractUrl(demo.rail.pool)}" target="_blank" rel="noopener">${short(demo.rail.pool, 8, 6)}</a>).`;
 }
 
+/** A holder is out of step when the register and the rail disagree about them. */
+const outOfStep = (h) => h.credentialValid === h.railBlocked;
+
 function renderHolders() {
   el('issuer-holders').querySelector('tbody').innerHTML = demo.holders.map((h) => `
     <tr data-holder="${h.name}">
@@ -50,18 +54,48 @@ function renderHolders() {
       <td>${h.credentialValid
         ? '<span class="badge ok">valid</span>'
         : '<span class="badge bad">revoked</span>'}</td>
-      <td>${h.railBlocked
-        ? '<span class="badge bad">frozen</span>'
-        : (h.allowlisted ? '<span class="badge ok">allowed</span>' : '<span class="badge public">pending</span>')}
-        ${h.credentialValid === h.railBlocked
-          ? '<div class="mono-sm" style="color:var(--seal)">out of step — sync</div>'
-          : ''}</td>
       <td><button class="ghost" data-revoke="${h.name}">${h.credentialValid ? 'Revoke' : 'Restore'}</button></td>
     </tr>`).join('');
 
   el('issuer-holders').querySelectorAll('[data-revoke]').forEach((btn) => {
     btn.addEventListener('click', () => toggleCredential(btn.dataset.revoke));
   });
+}
+
+/**
+ * The bridge panel: the two systems, per holder, and whether they agree.
+ *
+ * A disagreement is not a cosmetic warning — while it lasts, a revoked holder can
+ * still spend money already inside the rail, and the panel says so plainly.
+ */
+function renderBridge() {
+  const broken = demo.holders.filter(outOfStep);
+
+  el('bridge-table').querySelector('tbody').innerHTML = demo.holders.map((h) => `
+    <tr data-bridge="${h.name}">
+      <td>${h.name}</td>
+      <td>${h.credentialValid
+        ? '<span class="badge ok">credentialed</span>'
+        : '<span class="badge bad">revoked</span>'}</td>
+      <td class="link-cell" ${outOfStep(h) ? 'data-broken' : ''}>${outOfStep(h) ? '╳' : '───'}</td>
+      <td>${h.railBlocked
+        ? '<span class="badge bad">frozen</span>'
+        : '<span class="badge ok">can spend</span>'}</td>
+      <td class="mono-sm">${outOfStep(h) ? 'rail not told yet' : ''}</td>
+    </tr>`).join('');
+
+  el('bridge-link').toggleAttribute('data-broken', broken.length > 0);
+
+  el('bridge-state').innerHTML = broken.length
+    ? `<strong>${broken.length} holder(s) out of step.</strong> The register says revoked;
+       the rail has not been told. Until you sync, they can still spend what they hold.`
+    : `The rail follows the register. Revoking a credential freezes that holder —
+       including coupons they received before the revocation.`;
+
+  el('btn-prove').hidden = broken.length === 0;
+  el('btn-prove').dataset.holder = broken[0]?.name ?? '';
+
+  flow.reflectPolicy(demo.holders);
 }
 
 function renderCoupons() {
@@ -108,6 +142,7 @@ async function toggleCredential(name) {
     // association sets last said, which is why railBlocked is untouched here.
     holder.credentialValid = !revoking;
     renderHolders();
+    renderBridge();
     renderCoupons();
     renderMintTargets();
     if (out.hash) pushFeed(`${revoking ? 'revoked' : 'restored'} ${name}`, out.hash);
@@ -133,6 +168,7 @@ async function syncPolicy() {
     // The rail now agrees with the register.
     for (const h of demo.holders) h.railBlocked = !h.credentialValid;
     renderHolders();
+    renderBridge();
 
     for (const line of out.changes ?? []) pushFeed(line, out.hash ?? '');
     setProgress('sync-progress', out.changes?.length
@@ -178,6 +214,7 @@ async function issueTokens() {
 
     holder.position += amount;
     renderHolders();
+    renderBridge();
     renderCoupons();
     if (hash) pushFeed(`issued ${fmt(amount, 0)} ${demo.token.symbol} → ${name}`, hash);
 
@@ -205,9 +242,66 @@ async function issueTokens() {
   }
 }
 
+/**
+ * Withdraws as the revoked holder, to show the gap rather than assert it.
+ *
+ * Before syncing this succeeds: the register says revoked, the rail never heard, and
+ * the money leaves. After syncing the same attempt is refused. Two clicks, and the
+ * argument needs no explaining.
+ */
+async function proveTheGap() {
+  const name = el('btn-prove').dataset.holder;
+  const holder = demo.holders.find((h) => h.name === name);
+  if (!holder) return;
+
+  el('btn-prove').disabled = true;
+  el('prove-out').innerHTML = '';
+  setProgress('sync-progress', `attempting a withdrawal as ${name}…`, 'proving');
+
+  try {
+    const signer = new LocalSigner(holder.secret, NETWORK_PASSPHRASE);
+    const account = await openAccount(holder.address, signer, NETWORK_PASSPHRASE);
+    const pool = await openPool(account, demo.rail.pool);
+
+    const balance = await pool.balance();
+    if (!balance || balance <= 0n) {
+      el('prove-out').innerHTML = `<p class="hint">${name} holds nothing in the rail right
+        now — run a coupon cycle first and the gap becomes spendable money.</p>`;
+      return;
+    }
+
+    const amount = balance < 50_000_000n ? balance : 50_000_000n;   // up to 5 XLM
+    const outcome = describeResult(await pool.withdraw(amount));
+
+    for (const hash of outcome.hashes) pushFeed(`${name} withdrew from the rail`, hash);
+
+    el('prove-out').innerHTML = outcome.ok
+      ? `<p style="font:400 19px/1.3 var(--serif); color:var(--refused); margin:0 0 8px">
+           ${name} just took the money out.</p>
+         <p class="hint">Their credential is revoked. The token would refuse them — but the
+           rail was never told, so the withdrawal went through. Sync the policy and try again.</p>`
+      : `<p class="hint"><span class="badge ok">refused</span> ${outcome.message}</p>
+         <p class="hint" style="margin-top:8px">The rail now enforces the register's decision —
+           including the coupons this holder received before being revoked.</p>`;
+
+    setProgress('sync-progress', '');
+  } catch (error) {
+    // A refusal arrives as a thrown error on the client, before a transaction exists.
+    const message = String(error?.message ?? error);
+    el('prove-out').innerHTML = `
+      <p class="hint"><span class="badge ok">refused</span> ${message.split('\n')[0]}</p>
+      <p class="hint" style="margin-top:8px">The rail now enforces the register's decision —
+        including the coupons this holder received before being revoked.</p>`;
+    setProgress('sync-progress', '');
+  } finally {
+    el('btn-prove').disabled = false;
+  }
+}
+
 /** Pays every eligible holder from the treasury's pre-funded pool position. */
 async function payCycle() {
   el('btn-pay').disabled = true;
+  flow.at('pay');
   const stop = onProgress('transfer', (d) => setProgress('pay-progress', d.message, d.stage));
 
   try {
@@ -242,6 +336,7 @@ async function payCycle() {
     }
 
     setProgress('pay-progress', `${paid} coupon(s) paid — no amount readable on-chain`, 'done');
+    flow.done('pay');
   } catch (error) {
     setProgress('pay-progress', `failed: ${error?.message ?? error}`);
     console.error(error);
@@ -274,15 +369,18 @@ export async function mountIssuer(state) {
   demo = state ?? (await loadDemoState());
   renderSummary();
   renderHolders();
+  renderBridge();
   renderCoupons();
 
   renderMintTargets();
 
   await refreshPolicyState();
   renderHolders();
+  renderBridge();
   renderCoupons();
   renderMintTargets();
   el('btn-sync').addEventListener('click', syncPolicy);
   el('btn-pay').addEventListener('click', payCycle);
   el('btn-mint').addEventListener('click', issueTokens);
+  el('btn-prove').addEventListener('click', proveTheGap);
 }

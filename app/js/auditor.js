@@ -11,6 +11,7 @@
 import { RPC_URL, fmt, short, contractUrl } from './demo-state.js';
 import { verifyDisclosure } from './sdk-facade.js';
 import { expectedVkHash } from './vk-hashes.js';
+import * as flow from './flow.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -96,6 +97,7 @@ async function verify() {
 
     const report = await verifyDisclosure(RPC_URL, JSON.stringify(receipt), expected);
     renderReport(receipt, report);
+    flow.done('prove');
     el('verify-progress').textContent = '';
   } catch (error) {
     // A refusal is as informative as a pass — FR-15 wants this legible.

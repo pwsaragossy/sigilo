@@ -39,44 +39,76 @@
   </nav>
 </header>
 
+<!--
+  One coupon's journey, and which system governs each leg of it. The steps light up
+  as they happen, so it is always visible where in the cycle you are — and, more to
+  the point, that two different systems are being asked two different questions.
+-->
+<nav class="flow" aria-label="Lifecycle">
+  <ol>
+    <li data-step="credential"><span class="n">1</span><span class="what">Credential issued</span><span class="who">identity register</span></li>
+    <li data-step="policy"><span class="n">2</span><span class="what">Policy synced</span><span class="who">the bridge</span></li>
+    <li data-step="pay"><span class="n">3</span><span class="what">Coupon paid</span><span class="who">confidential rail</span></li>
+    <li data-step="receive"><span class="n">4</span><span class="what">Holder decrypts</span><span class="who">holder's key</span></li>
+    <li data-step="prove"><span class="n">5</span><span class="what">Auditor verifies</span><span class="who">zero-knowledge proof</span></li>
+  </ol>
+</nav>
+
 <main>
   <div id="fatal" hidden class="banner"></div>
 
   <section id="panel-issuer" role="tabpanel" aria-labelledby="tab-issuer">
     <div class="panel">
-      <h2>Register</h2>
-      <p class="hint" id="issuer-summary">Loading deployment…</p>
+      <h2>The asset</h2>
+      <div class="hint" id="issuer-summary">Loading deployment…</div>
+    </div>
+
+    <!--
+      The bridge, given a panel of its own. Two systems, each governing a different
+      question, and the link between them — which is the thing this project adds and
+      the thing a table with two columns cannot show.
+    -->
+    <div class="panel bridge">
+      <h2>Policy — one credential, two systems</h2>
+      <div class="bridge-grid">
+        <div class="side">
+          <div class="side-title">Identity register</div>
+          <div class="side-sub">who may hold the asset</div>
+        </div>
+        <div class="link" id="bridge-link" aria-hidden="true"></div>
+        <div class="side">
+          <div class="side-title">Confidential rail</div>
+          <div class="side-sub">who may move money inside it</div>
+        </div>
+      </div>
+
+      <table id="bridge-table">
+        <thead><tr><th>Holder</th><th>Credential</th><th></th><th>Rail</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="bridge-state" id="bridge-state"></div>
+      <div style="margin-top:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+        <button class="action" id="btn-sync">Sync policy</button>
+        <button class="ghost" id="btn-prove" hidden>Prove it — withdraw as the revoked holder</button>
+        <span class="progress" id="sync-progress"></span>
+      </div>
+      <div id="prove-out" style="margin-top:12px"></div>
     </div>
 
     <div class="panel">
-      <h2>Holders &amp; credentials</h2>
+      <h2>Holders</h2>
       <table id="issuer-holders">
         <thead>
-          <tr>
-            <th>Holder</th><th>Position</th><th>Entry</th>
-            <th>Credential</th><th>Rail</th><th></th>
-          </tr>
+          <tr><th>Holder</th><th>Position</th><th>Entry</th><th>Credential</th><th></th></tr>
         </thead>
         <tbody></tbody>
       </table>
-      <p class="hint" style="margin-top:14px">
-        The registry is the authority. <em>Sync compliance policy</em> makes the rail's
-        association sets follow it — grant puts a holder in the allowlist, revocation
-        puts them in the blocklist and freezes what they already hold.
-      </p>
-      <div style="margin-top:14px; display:flex; gap:10px; align-items:center">
-        <button class="action" id="btn-sync">Sync compliance policy</button>
-        <span class="progress" id="sync-progress"></span>
-      </div>
     </div>
 
     <div class="panel">
       <h2>Issue tokens</h2>
-      <p class="hint">
-        The token asks the identity registry before it moves. A holder whose credential
-        has been revoked cannot receive it — the contract refuses, during simulation,
-        before a transaction is built.
-      </p>
+      <p class="hint">The token asks the register before it moves.</p>
       <div style="margin-top:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
         <select id="mint-to" class="ghost"></select>
         <input id="mint-amount" class="ghost" type="number" value="100" min="1" step="1"
@@ -90,6 +122,11 @@
 
     <div class="panel">
       <h2>Coupon cycle</h2>
+      <p class="hint">
+        Coupons are paid <strong>through the confidential rail</strong> — the amounts do not
+        appear on the ledger. Whether a holder can then spend what they received is decided
+        by the policy above.
+      </p>
       <p class="hint" id="coupon-terms"></p>
       <table id="coupon-table">
         <thead>
