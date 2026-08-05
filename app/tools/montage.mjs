@@ -55,7 +55,7 @@ const SCRIPT = [
   ['act3',         0, 5, 'ACT 3 — Proving one payment, and nothing else', 'Hiding payments is easy. Proving one on demand is not.'],
   ['proving',      0, 5, 'The holder proves a single coupon', 'The circuit needs their note key — only they can produce this'],
   ['verified',     0, 7, 'Verified. No wallet, no stored keys, no privileged access', 'Amount proven · reference attested — the line is not blurred'],
-  ['tampered',     0, 6, 'One digit of the proof changed', 'Refused — and only the proof check fails'],
+  ['tampered',     0, 6, 'The claimed amount, raised by one digit', 'Refused — and only the proof check fails'],
   ['tampered',     6, 6, 'Permissioned asset · confidential payments · one policy', 'github.com/pwsaragossy/sigilo'],
 ];
 

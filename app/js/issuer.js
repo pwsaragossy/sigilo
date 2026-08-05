@@ -69,7 +69,9 @@ function renderHolders() {
       <td data-spend>${h.railBlocked
         ? '<span class="badge bad">frozen</span>'
         : (h.allowlisted ? '<span class="badge ok">allowed</span>' : '<span class="badge public">pending</span>')}
-        ${outOfStep(h) ? '<div class="mono-sm out-of-step">out of step — sync</div>' : ''}</td>
+        ${outOfStep(h) ? `<div class="mono-sm out-of-step">${h.credentialValid
+          ? 'restored — but the rail still freezes them'
+          : 'revoked — but the rail still lets them spend'}</div>` : ''}</td>
       <td><button class="ghost" data-revoke="${h.name}">${h.credentialValid ? 'Revoke' : 'Restore'}</button></td>
     </tr>`).join('');
 
@@ -102,8 +104,35 @@ function renderBridge() {
 
   el('bridge-link').toggleAttribute('data-broken', broken.length > 0);
 
-  el('btn-prove').hidden = broken.length === 0;
-  el('btn-prove').dataset.holder = broken[0]?.name ?? '';
+  // "Out of step" is the thesis, so it does not get to be a whisper. The banner
+  // names who, what was never told, and what is at stake — in the direction the
+  // disagreement actually cuts: revoked-but-spendable is the gap this project
+  // exists to close; restored-but-frozen is only the rail lagging the register.
+  const open = broken.filter((h) => !h.credentialValid);
+  const banner = el('gap-banner');
+  banner.hidden = broken.length === 0;
+  banner.classList.toggle('gold', open.length === 0);
+  if (open.length) {
+    const names = open.map((h) => h.name).join(', ');
+    banner.innerHTML = `<strong>The gap is open.</strong> ${names} ${open.length > 1 ? 'are' : 'is'}
+      revoked in the identity register, but the confidential rail was never told — coupons already
+      in the pool are still spendable. “Prove it” spends them; “Sync policy” closes the gap.`;
+  } else if (broken.length) {
+    const names = broken.map((h) => h.name).join(', ');
+    banner.innerHTML = `${names} ${broken.length > 1 ? 'are' : 'is'} back in good standing in the
+      register, but the rail still freezes ${broken.length > 1 ? 'them' : 'them'}. “Sync policy” lifts it.`;
+  }
+
+  // Always visible: hidden, this button teaches nothing. Disarmed it names the
+  // setup; armed it names the holder — the outcome a click away, not a mechanism.
+  const prove = el('btn-prove');
+  const target = broken[0];
+  prove.disabled = !target;
+  prove.classList.toggle('danger', !!target);
+  prove.textContent = target
+    ? `Prove it — withdraw as ${target.name}, whose credential is revoked`
+    : 'The gap — revoke a holder, then watch them still withdraw';
+  prove.dataset.holder = target?.name ?? '';
 
   flow.reflectPolicy(demo.holders);
 }
@@ -175,15 +204,26 @@ async function syncPolicy() {
     const out = await res.json();
     if (!res.ok) throw new Error(out.error ?? 'failed');
 
-    // The rail now agrees with the register.
-    for (const h of demo.holders) h.railBlocked = !h.credentialValid;
+    // Re-read both systems rather than assuming the sync landed. Painting every
+    // holder as synced was a lie the interface could tell for free: a refused
+    // bridge call left the rail unchanged and the badges said otherwise, which
+    // is the exact divergence this project exists to make visible.
+    const live = await refreshPolicyState();
     renderHolders();
     renderBridge();
+    renderCoupons();
 
-    for (const line of out.changes ?? []) pushFeed(line, out.hash ?? '');
-    setProgress('sync-progress', out.changes?.length
-      ? `${out.changes.length} change(s) applied — proofs built against the old roots are now void`
-      : 'allow-list and blocklist already match the registry');
+    const lines = out.changes ?? [];
+    const failed = lines.filter((l) => l.includes('FAILED'));
+    for (const line of lines) pushFeed(line, out.hash ?? '');
+
+    setProgress('sync-progress', !live
+      ? 'sync ran, but the chain could not be re-read — the badges below may be stale'
+      : failed.length
+        ? `${failed.length} holder(s) did not sync — see Activity; the rows above show the real state`
+        : lines.length
+          ? `${lines.length} change(s) applied — proofs built against the old roots are now void`
+          : 'allow-list and blocklist already match the registry');
   } catch (error) {
     setProgress('sync-progress', `failed: ${error?.message ?? error}`);
   } finally {
@@ -305,11 +345,49 @@ async function proveTheGap() {
   }
 }
 
+const escapeHtml = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+/**
+ * Attempts the forbidden write, live — the one claim that is not self-attested.
+ *
+ * The issuer asks the network to insert a leaf into the allow-list directly,
+ * skipping the contract. The refusal is the moat: the trees' admin is the
+ * PolicyBridge, and a contract has no private key. Nothing here is staged —
+ * the same command a skeptic would type, and the network's own answer.
+ */
+async function tryBypass() {
+  el('btn-bypass').disabled = true;
+  el('bypass-out').innerHTML = '<p class="hint">asking the network to let the issuer write to the allow-list directly…</p>';
+
+  try {
+    const res = await fetch('/api/bypass', { method: 'POST' });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error ?? 'failed');
+
+    el('bypass-out').innerHTML = out.refused
+      ? `<div class="terminal">$ stellar contract invoke --id ${short(out.allowlist, 8, 6)} --source issuer -- insert_leaf --leaf 999888777
+<span class="err">${escapeHtml(out.error)}</span></div>
+        <p class="hint" style="margin-top:10px">Refused by the network, not by this interface.
+        That account is the PolicyBridge contract — it owns both lists and has no private key,
+        so the only path to them runs through its registry check.</p>`
+      : `<p class="hint"><span class="badge bad">⚠ the write went through</span>
+         The association sets still answer to the operator — the handover to the
+         contract did not take. Every guarantee above is decorative until it does.</p>`;
+  } catch (error) {
+    el('bypass-out').innerHTML = `<p class="hint">failed: ${escapeHtml(String(error?.message ?? error))}</p>`;
+  } finally {
+    el('btn-bypass').disabled = false;
+  }
+}
+
 /** Pays every eligible holder from the treasury's pre-funded pool position. */
 async function payCycle() {
   el('btn-pay').disabled = true;
   flow.at('pay');
-  const stop = onProgress('transfer', (d) => setProgress('pay-progress', d.message, d.stage));
+  // The ~9s of silence per payment reads as "broken" until it is named as work.
+  const stop = onProgress('transfer', (d) => setProgress('pay-progress',
+    d.stage === 'proving' ? `${d.message} · ~9s of real proof, not simulated` : d.message,
+    d.stage));
 
   try {
     const signer = new LocalSigner(demo.treasury.secret, NETWORK_PASSPHRASE);
@@ -357,18 +435,24 @@ async function payCycle() {
  * Reads both systems from the chain rather than trusting local files, so a
  * divergence between the register and the rail shows up instead of being
  * papered over.
+ *
+ * Returns whether the read succeeded. The caller has to know: after a sync, a
+ * failed read means the badges are stale seed values, and showing those as if
+ * they were chain state is how a demo tells its audience the opposite of what
+ * happened.
  */
 async function refreshPolicyState() {
   try {
     const res = await fetch('/api/status');
     const out = await res.json();
-    if (!res.ok) return;
+    if (!res.ok) return false;
     for (const holder of demo.holders) {
       const live = out.holders?.[holder.name];
       if (live) Object.assign(holder, live);
     }
+    return true;
   } catch {
-    // Falls back to the seed's view; the badges stay honest either way.
+    return false;
   }
 }
 
@@ -390,4 +474,5 @@ export async function mountIssuer(state) {
   el('btn-pay').addEventListener('click', payCycle);
   el('btn-mint').addEventListener('click', issueTokens);
   el('btn-prove').addEventListener('click', proveTheGap);
+  el('btn-bypass').addEventListener('click', tryBypass);
 }

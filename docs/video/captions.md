@@ -98,7 +98,7 @@ text, kept separate so a sentence can be fixed without re-recording anything.
 > This receipt says nothing about any other payment, this holder's balance, or who else was
 > paid in the same cycle.
 
-> Now change one digit of the proof.
+> Now raise the receipt's claimed amount — by one digit.
 
 > **Refused** — and only the proof check fails. The other three still pass, so you can see
 > exactly which guarantee broke.

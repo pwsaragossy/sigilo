@@ -82,7 +82,7 @@ async function verify() {
   // Clear the previous verdict first. Verification takes ~10s, and leaving the
   // last answer on screen while a new receipt is checked reads as approval.
   el('verify-out').innerHTML = '<p class="hint">Checking the proof against the circuit…</p>';
-  el('verify-progress').textContent = 'verifying…';
+  el('verify-progress').textContent = 'verifying — ~13s of real cryptography…';
   el('btn-verify').disabled = true;
 
   try {
@@ -108,18 +108,27 @@ async function verify() {
   }
 }
 
-/** Flips one digit of the proof, to show the check is real. */
+/**
+ * Raises the claimed amount, to show the proof binds the exact statement.
+ *
+ * Deliberately not a proof-byte flip: corrupting the encoding dies at
+ * deserialization with a blunt "invalid data" — the check table never renders,
+ * which demonstrates nothing about the circuit. Altering the public input
+ * keeps the receipt well-formed, so verification actually runs — and returns
+ * Proof: no while context, root and nullifier still pass.
+ */
 function tamper() {
   const raw = el('receipt-input').value.trim();
-  if (!raw) return;
+  if (!raw) { el('verify-progress').textContent = 'paste a receipt first'; return; }
   try {
     const receipt = JSON.parse(raw);
-    const proof = receipt.proofCompressedHex;
-    const i = proof.length - 3;
-    const flipped = proof[i] === 'a' ? 'b' : 'a';
-    receipt.proofCompressedHex = proof.slice(0, i) + flipped + proof.slice(i + 1);
+    const amounts = receipt.publicInputs?.amounts;
+    if (!amounts?.length) throw new Error('not a receipt');
+    const a = String(amounts[0]);
+    amounts[0] = (a[0] === '9' ? '1' : String(Number(a[0]) + 1)) + a.slice(1);
     el('receipt-input').value = JSON.stringify(receipt, null, 2);
-    el('verify-progress').textContent = 'one digit of the proof changed — verify again';
+    el('verify-progress').textContent =
+      `the receipt now claims ${fmt(Number(amounts[0]) / 1e7)} XLM — verify again`;
   } catch {
     el('verify-progress').textContent = 'paste a receipt first';
   }

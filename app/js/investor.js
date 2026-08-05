@@ -130,7 +130,9 @@ async function generateReceipt() {
   if (!current || !selectedNote) return;
 
   flow.at('prove');
-  const stop = onProgress('disclose', (d) => setProgress(d.message, d.stage));
+  const stop = onProgress('disclose', (d) => setProgress(
+    d.stage === 'proving' ? `${d.message} · ~13s of real proof, not simulated` : d.message,
+    d.stage));
   el('btn-disclose').disabled = true;
 
   try {

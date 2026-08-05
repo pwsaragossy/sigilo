@@ -5,6 +5,7 @@ import { initRuntime, isDbLocked } from './sdk-facade.js';
 import { mountIssuer } from './issuer.js';
 import { mountInvestor } from './investor.js';
 import { mountAuditor } from './auditor.js';
+import * as flow from './flow.js';
 
 const fatal = document.getElementById('fatal');
 
@@ -31,6 +32,9 @@ function wireTabs() {
 
 async function start() {
   wireTabs();
+  // The bar opens with a "you are here", not five dim words: the cycle starts
+  // where every holder's story starts, at the credential.
+  flow.at('credential');
 
   try {
     const demo = await loadDemoState();

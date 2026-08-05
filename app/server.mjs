@@ -47,6 +47,15 @@ async function readBody(req) {
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {};
 }
 
+// SPP_REPO and OZ_REPO are machine-local constants, not per-session choices —
+// losing them to a fresh terminal kept breaking the demo. A gitignored .env at
+// the repo root is the fallback; an exported shell variable still wins.
+const dotenv = await readFile(resolve(ROOT, '.env'), 'utf8').catch(() => '');
+for (const line of dotenv.split('\n')) {
+  const m = line.match(/^(\w+)=(.*)$/);
+  if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+}
+
 const env = {
   ...process.env,
   SPP_REPO: process.env.SPP_REPO ?? '',
@@ -106,6 +115,41 @@ async function handleSync(_req, res) {
   }
 }
 
+/**
+ * The one claim that is not self-attested: the operator's own write, refused.
+ *
+ * Attempts a direct insert into the allow-list as the issuer — the same lockout
+ * check deploy-bridge.sh ends with. The trees' admin is the PolicyBridge
+ * contract, and a contract has no signing key, so the CLI fails before a
+ * transaction exists. Shown live because a transcript would be an assertion;
+ * this is the network's answer, on demand.
+ */
+async function handleBypass(_req, res) {
+  try {
+    const rail = JSON.parse(await readFile(resolve(ROOT, '.demo-state/rail.json'), 'utf8'));
+    const args = [
+      'contract', 'invoke',
+      '--rpc-url', process.env.STELLAR_RPC_URL ?? 'https://soroban-testnet.stellar.org',
+      '--network-passphrase', process.env.STELLAR_NETWORK_PASSPHRASE ?? 'Test SDF Network ; September 2015',
+      '--id', rail.asp_membership, '--source', 'sigilo-admin',
+      '--', 'insert_leaf', '--leaf', '999888777',
+    ];
+    try {
+      await run('stellar', args, { env, timeout: 30_000 });
+      // Success would mean the handover never took — say so as loudly as the script does.
+      return json(res, 200, { refused: false, allowlist: rail.asp_membership });
+    } catch (error) {
+      return json(res, 200, {
+        refused: true,
+        allowlist: rail.asp_membership,
+        error: (error.stderr || error.message).trim(),
+      });
+    }
+  } catch (error) {
+    return json(res, 500, { error: String(error?.message ?? error) });
+  }
+}
+
 async function serveStatic(req, res) {
   const url = new URL(req.url, 'http://localhost');
   let path = decodeURIComponent(url.pathname);
@@ -140,6 +184,7 @@ createServer(async (req, res) => {
   try {
     if (req.method === 'POST' && req.url === '/api/credential') return await handleCredential(req, res);
     if (req.method === 'POST' && req.url === '/api/sync') return await handleSync(req, res);
+    if (req.method === 'POST' && req.url === '/api/bypass') return await handleBypass(req, res);
     if (req.method === 'GET' && req.url === '/api/status') return await handleStatus(req, res);
     return await serveStatic(req, res);
   } catch (error) {

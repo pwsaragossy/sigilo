@@ -25,7 +25,7 @@
 <header>
   <div class="brand">
     <h1>Sigilo</h1>
-    <span class="tag">policy-gated confidential coupon payments · stellar testnet</span>
+    <span class="tag">one credential, two enforcement points · stellar testnet</span>
   </div>
 
   <!--
@@ -72,6 +72,7 @@
     <div class="panel bridge">
       <h2>Policy enforcement — one credential, two places it binds</h2>
       <div class="hint" id="bridge-enforcer" style="margin:-6px 0 18px"></div>
+      <div id="gap-banner" hidden class="banner" aria-live="polite" style="margin:0 0 16px"></div>
 
       <table id="issuer-holders">
         <thead>
@@ -98,10 +99,12 @@
 
       <div style="margin-top:18px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
         <button class="action" id="btn-sync">Sync policy</button>
-        <button class="ghost" id="btn-prove" hidden>Prove it — withdraw as the revoked holder</button>
-        <span class="progress" id="sync-progress"></span>
+        <button class="ghost" id="btn-prove" disabled>The gap — revoke a holder, then watch them still withdraw</button>
+        <button class="ghost" id="btn-bypass">Try to bypass it — write to the allow-list as the issuer</button>
+        <span class="progress" id="sync-progress" aria-live="polite"></span>
       </div>
       <div id="prove-out" style="margin-top:12px"></div>
+      <div id="bypass-out" style="margin-top:12px"></div>
     </div>
 
     <div class="panel">
@@ -113,7 +116,7 @@
                style="width:110px; padding:10px 13px; background:var(--ink); color:var(--vellum);
                       border:1px solid var(--ink-line); border-radius:4px; font:400 13px var(--mono)">
         <button class="action" id="btn-mint">Issue</button>
-        <span class="progress" id="mint-progress"></span>
+        <span class="progress" id="mint-progress" aria-live="polite"></span>
       </div>
       <div id="mint-out" style="margin-top:14px"></div>
     </div>
@@ -130,7 +133,7 @@
       </table>
       <div style="margin-top:16px; display:flex; gap:10px; align-items:center">
         <button class="action" id="btn-pay">Pay coupon cycle</button>
-        <span class="progress" id="pay-progress"></span>
+        <span class="progress" id="pay-progress" aria-live="polite"></span>
       </div>
     </div>
 
@@ -145,7 +148,7 @@
       <h2>Holder</h2>
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
         <select id="investor-pick" class="ghost" style="padding:9px"></select>
-        <span class="progress" id="investor-progress"></span>
+        <span class="progress" id="investor-progress" aria-live="polite"></span>
       </div>
     </div>
 
@@ -173,7 +176,7 @@
       <div id="disclose-notes" style="margin:16px 0"></div>
       <div style="display:flex; gap:10px; align-items:center">
         <button class="action" id="btn-disclose" disabled>Generate receipt</button>
-        <span class="progress" id="disclose-progress"></span>
+        <span class="progress" id="disclose-progress" aria-live="polite"></span>
       </div>
       <div id="disclose-out" style="margin-top:16px"></div>
     </div>
@@ -186,7 +189,7 @@
       <div style="margin-top:12px; display:flex; gap:10px; align-items:center">
         <button class="action" id="btn-verify">Verify</button>
         <button class="ghost" id="btn-tamper">Tamper with it</button>
-        <span class="progress" id="verify-progress"></span>
+        <span class="progress" id="verify-progress" aria-live="polite"></span>
       </div>
     </div>
 

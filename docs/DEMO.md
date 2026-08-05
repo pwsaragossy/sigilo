@@ -92,7 +92,7 @@ This is the part that makes confidentiality acceptable rather than suspicious. H
 
 **Why step 6 matters.** The interface distinguishes what mathematics proves from what a person asserts. The amount is proven. The label *"coupon 2026-H2"* is attested — tamper-evident, but true only because whoever wrote it says so. Overclaiming here is how a system loses a technical audience.
 
-**Why step 7 matters.** One digit of the proof changed, and the verdict flips — while the other three checks still pass, so you can see exactly which guarantee broke. The refusal is as much the demonstration as the success.
+**Why step 7 matters.** The claimed amount was raised by one digit, and the verdict flips — while the other three checks still pass, so you can see exactly which guarantee broke. The proof binds the exact statement: a receipt cannot claim more than was paid. The refusal is as much the demonstration as the success.
 
 ---
 

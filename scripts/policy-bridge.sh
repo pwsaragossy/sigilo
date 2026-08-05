@@ -90,9 +90,21 @@ is_credentialed() {  # is_credentialed <stellar account alias>
 # re-checks the register before touching anything. A wrong proposal here is
 # refused on-chain rather than quietly applied, which is the difference between
 # this script being trusted and being merely convenient.
+#
+# Sets BRIDGE_ERR to the contract's own words on failure. Swallowing that was a
+# bug worth naming: the caller then recorded a freeze that never happened, and
+# every layer above repeated it. A refusal here is information — #3
+# StillCredentialed means the register disagrees, and that is the whole point.
 bridge_call() {  # bridge_call <grant|revoke|restore> <args...>
   local action="$1"; shift
-  stellar contract invoke "${NET[@]}" --id "$BRIDGE" --source "$ADMIN" -- "$action" "$@" >/dev/null 2>&1
+  local out
+  if out=$(stellar contract invoke "${NET[@]}" --id "$BRIDGE" --source "$ADMIN" -- "$action" "$@" 2>&1); then
+    BRIDGE_ERR=""
+    return 0
+  fi
+  BRIDGE_ERR=$(sed -n 's/.*error: //p' <<<"$out" | head -1)
+  [[ -n "$BRIDGE_ERR" ]] || BRIDGE_ERR=$(tail -1 <<<"$out")
+  return 1
 }
 
 is_blocklisted() {  # is_blocklisted <note_key_decimal>
@@ -148,7 +160,7 @@ cmd_enroll() {
 # ---------------------------------------------------------------------------
 cmd_sync() {
   step "syncing association sets against the identity registry"
-  local changes=0
+  local changes=0 failures=0
 
   for name in $(jq -r '.holders[].name' "$RWA_STATE"); do
     local alias="sigilo-$name"
@@ -176,27 +188,41 @@ cmd_sync() {
         changes=$((changes + 1))
       fi
       if is_blocklisted "$note_dec"; then
-        bridge_call restore --holder "$holder" --note_key "$note_dec" || true
-        policy_set "$name" blocked false
-        echo "  $name: credential restored → unfrozen"
-        changes=$((changes + 1))
+        if bridge_call restore --holder "$holder" --note_key "$note_dec"; then
+          policy_set "$name" blocked false
+          echo "  $name: credential restored → unfrozen"
+          changes=$((changes + 1))
+        else
+          echo "  $name: FAILED to unfreeze — $BRIDGE_ERR"
+          failures=$((failures + 1))
+        fi
       fi
     else
       # No valid credential: freeze. The allowlist tree is append-only, so the
       # blocklist is the only lever — and it is the stronger one, since the pool
       # rejects proofs against a stale root.
       if ! is_blocklisted "$note_dec"; then
-        bridge_call revoke --holder "$holder" --note_key "$note_dec" || true
-        policy_set "$name" blocked true
-        echo "  $name: credential absent → blocklisted (pool balance frozen)"
-        changes=$((changes + 1))
+        if bridge_call revoke --holder "$holder" --note_key "$note_dec"; then
+          policy_set "$name" blocked true
+          echo "  $name: credential absent → blocklisted (pool balance frozen)"
+          changes=$((changes + 1))
+        else
+          echo "  $name: FAILED to freeze — $BRIDGE_ERR"
+          failures=$((failures + 1))
+        fi
       fi
     fi
   done
 
-  if (( changes == 0 )); then
+  if (( failures > 0 )); then
+    echo
+    echo "  $failures holder(s) did NOT sync — the association sets still disagree"
+    echo "  with the registry for them. Re-run sync; the lines above say why."
+  fi
+
+  if (( changes == 0 && failures == 0 )); then
     echo "  association sets already match the registry"
-  else
+  elif (( changes > 0 )); then
     echo
     echo "  $changes change(s) applied — in-flight proofs built against the previous"
     echo "  roots are now invalid and must be regenerated."

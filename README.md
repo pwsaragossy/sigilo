@@ -44,7 +44,7 @@ Reproduced on testnet, every hash public.
 
 **Revocation freezes, and the gap is visible.** After revoking a credential in the register, the holder still withdrew from the pool ([`c2f2264a`](https://stellar.expert/explorer/testnet/tx/c2f2264ad3d599dac9f7205c3c987568794d83785a7085dcce39de871805aeeb)). After running Sync, the same withdrawal was refused — *"user note key exists in non-membership tree"*. That first step is the argument: with nothing joining the two, an issuer who revokes a holder has revoked nothing where the money is.
 
-**An auditor verifies one payment and learns nothing else.** The holder generates a proof for a single coupon; the auditor checks it with no wallet, no storage and no privileged access. Change one digit of the proof and the verdict flips to Refused with `Proof: no`, while the other checks still pass — the interface says which guarantee broke.
+**An auditor verifies one payment and learns nothing else.** The holder generates a proof for a single coupon; the auditor checks it with no wallet, no storage and no privileged access. Raise the receipt's claimed amount by one digit and the verdict flips to Refused with `Proof: no`, while the other checks still pass — the interface says which guarantee broke.
 
 ### The run, with hashes
 
