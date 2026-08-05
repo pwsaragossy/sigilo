@@ -64,47 +64,44 @@
     </div>
 
     <!--
-      The bridge, given a panel of its own. Two systems, each governing a different
-      question, and the link between them — which is the thing this project adds and
-      the thing a table with two columns cannot show.
+      One table, two systems. The grouping row is the point: the credential column
+      belongs to the register, the spend column belongs to the rail, and the cell
+      between them is the link that can break. A holder's two verdicts sit side by
+      side on their own row, which is the thing a second table could never show.
     -->
     <div class="panel bridge">
       <h2>Policy — one credential, two systems</h2>
-      <div class="hint" id="bridge-enforcer" style="margin:-6px 0 16px"></div>
-      <div class="bridge-grid">
-        <div class="side">
-          <div class="side-title">Identity register</div>
-          <div class="side-sub">who may hold the asset</div>
-        </div>
-        <div class="link" id="bridge-link" aria-hidden="true"></div>
-        <div class="side">
-          <div class="side-title">Confidential rail</div>
-          <div class="side-sub">who may move money inside it</div>
-        </div>
-      </div>
+      <div class="hint" id="bridge-enforcer" style="margin:-6px 0 18px"></div>
 
-      <table id="bridge-table">
-        <thead><tr><th>Holder</th><th>Credential</th><th></th><th>Rail</th><th></th></tr></thead>
+      <table id="issuer-holders">
+        <thead>
+          <tr class="systems">
+            <td colspan="3"></td>
+            <th scope="colgroup">
+              Identity register
+              <div class="side-sub">who may hold the asset</div>
+            </th>
+            <th><div class="link" id="bridge-link" aria-hidden="true"></div></th>
+            <th scope="colgroup">
+              Confidential rail
+              <div class="side-sub">who may move money inside it</div>
+            </th>
+            <td></td>
+          </tr>
+          <tr>
+            <th>Holder</th><th class="num">Position</th><th>Entry</th>
+            <th>Credential</th><th></th><th>Spend</th><th></th>
+          </tr>
+        </thead>
         <tbody></tbody>
       </table>
 
-      <div class="bridge-state" id="bridge-state"></div>
-      <div style="margin-top:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+      <div style="margin-top:18px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
         <button class="action" id="btn-sync">Sync policy</button>
         <button class="ghost" id="btn-prove" hidden>Prove it — withdraw as the revoked holder</button>
         <span class="progress" id="sync-progress"></span>
       </div>
       <div id="prove-out" style="margin-top:12px"></div>
-    </div>
-
-    <div class="panel">
-      <h2>Holders</h2>
-      <table id="issuer-holders">
-        <thead>
-          <tr><th>Holder</th><th>Position</th><th>Entry</th><th>Credential</th><th></th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
     </div>
 
     <div class="panel">
@@ -123,11 +120,7 @@
 
     <div class="panel">
       <h2>Coupon cycle</h2>
-      <p class="hint">
-        Coupons are paid <strong>through the confidential rail</strong> — the amounts do not
-        appear on the ledger. Whether a holder can then spend what they received is decided
-        by the policy above.
-      </p>
+      <p class="hint">Paid through the confidential rail — no amount reaches the ledger.</p>
       <p class="hint" id="coupon-terms"></p>
       <table id="coupon-table">
         <thead>
@@ -161,8 +154,7 @@
         <h2>What anyone can see</h2>
         <dl class="fields" id="investor-public"></dl>
         <p class="hint" style="margin-top:16px">
-          A securities register should be legible to a regulator, so positions stay public.
-          What the rail hides is the <em>payment flow</em> — the treasury's operation.
+          The position was never secret. The payment always was.
         </p>
       </div>
 
@@ -175,8 +167,8 @@
     <div class="panel">
       <h2>Disclose a payment to an auditor</h2>
       <p class="hint">
-        One payment, chosen by the holder. The circuit needs this note's private key,
-        so nobody else — not even the issuer — can produce this proof.
+        One payment, chosen by the holder. The circuit needs this note's private key —
+        not even the issuer can produce this proof.
       </p>
       <div id="disclose-notes" style="margin:16px 0"></div>
       <div style="display:flex; gap:10px; align-items:center">
@@ -202,9 +194,7 @@
       <h2>Verdict</h2>
       <div id="verify-out">
         <p class="empty">
-          Nothing has been disclosed to you. Beyond a receipt someone hands over,
-          this rail shows an auditor nothing — no balances, no counterparties,
-          no other payments.
+          Nothing has been disclosed to you. Without a receipt, an auditor sees nothing here.
         </p>
       </div>
     </div>

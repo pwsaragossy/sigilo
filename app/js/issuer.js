@@ -45,15 +45,31 @@ function renderSummary() {
 /** A holder is out of step when the register and the rail disagree about them. */
 const outOfStep = (h) => h.credentialValid === h.railBlocked;
 
+/**
+ * One row per holder, carrying both verdicts.
+ *
+ * The credential cell answers the register's question, the spend cell answers the
+ * rail's, and the cell between them is the link. When they disagree the row says so
+ * where the eye already is — the revoke button is on the same line.
+ *
+ * The two verdict cells are marked with data attributes rather than left to be found
+ * by column index: a layout change once moved them silently, and the recorder went on
+ * asserting against the old positions.
+ */
 function renderHolders() {
   el('issuer-holders').querySelector('tbody').innerHTML = demo.holders.map((h) => `
     <tr data-holder="${h.name}">
       <td>${h.name}<div class="mono-sm">${short(h.address, 8, 6)}</div></td>
       <td class="num">${fmt(h.position, 0)}</td>
       <td>${h.entryDate}</td>
-      <td>${h.credentialValid
+      <td data-credential>${h.credentialValid
         ? '<span class="badge ok">valid</span>'
         : '<span class="badge bad">revoked</span>'}</td>
+      <td class="link-cell" ${outOfStep(h) ? 'data-broken' : ''}>${outOfStep(h) ? '╳' : '───'}</td>
+      <td data-spend>${h.railBlocked
+        ? '<span class="badge bad">frozen</span>'
+        : (h.allowlisted ? '<span class="badge ok">allowed</span>' : '<span class="badge public">pending</span>')}
+        ${outOfStep(h) ? '<div class="mono-sm out-of-step">out of step — sync</div>' : ''}</td>
       <td><button class="ghost" data-revoke="${h.name}">${h.credentialValid ? 'Revoke' : 'Restore'}</button></td>
     </tr>`).join('');
 
@@ -63,10 +79,11 @@ function renderHolders() {
 }
 
 /**
- * The bridge panel: the two systems, per holder, and whether they agree.
+ * The header link, and who is enforcing any of this.
  *
  * A disagreement is not a cosmetic warning — while it lasts, a revoked holder can
- * still spend money already inside the rail, and the panel says so plainly.
+ * still spend money already inside the rail. The rows above say which holders; this
+ * says whether the two systems agree at all.
  */
 function renderBridge() {
   const broken = demo.holders.filter(outOfStep);
@@ -82,26 +99,7 @@ function renderBridge() {
     : `Kept in step by an off-chain service. Nothing on-chain compels it to mirror the
        register faithfully — deploy the PolicyBridge contract to remove that trust.`;
 
-  el('bridge-table').querySelector('tbody').innerHTML = demo.holders.map((h) => `
-    <tr data-bridge="${h.name}">
-      <td>${h.name}</td>
-      <td>${h.credentialValid
-        ? '<span class="badge ok">credentialed</span>'
-        : '<span class="badge bad">revoked</span>'}</td>
-      <td class="link-cell" ${outOfStep(h) ? 'data-broken' : ''}>${outOfStep(h) ? '╳' : '───'}</td>
-      <td>${h.railBlocked
-        ? '<span class="badge bad">frozen</span>'
-        : '<span class="badge ok">can spend</span>'}</td>
-      <td class="mono-sm">${outOfStep(h) ? 'rail not told yet' : ''}</td>
-    </tr>`).join('');
-
   el('bridge-link').toggleAttribute('data-broken', broken.length > 0);
-
-  el('bridge-state').innerHTML = broken.length
-    ? `<strong>${broken.length} holder(s) out of step.</strong> The register says revoked;
-       the rail has not been told. Until you sync, they can still spend what they hold.`
-    : `The rail follows the register. Revoking a credential freezes that holder —
-       including coupons they received before the revocation.`;
 
   el('btn-prove').hidden = broken.length === 0;
   el('btn-prove').dataset.holder = broken[0]?.name ?? '';
@@ -113,7 +111,7 @@ function renderCoupons() {
   el('coupon-terms').innerHTML = `
     ${COUPON.annualRatePct}% per annum, actual/${COUPON.dayCountBasis}, accrued from each
     holder's entry date to ${COUPON.paymentDate}. Reference <strong>${COUPON.reference}</strong>.
-    Amounts are not proportional to positions — that is deliberate, since positions are public.`;
+    Not proportional to positions — deliberately, since positions are public.`;
 
   el('coupon-table').querySelector('tbody').innerHTML = demo.holders.map((h) => {
     const { days, amount } = accruedCoupon(h);
@@ -239,9 +237,7 @@ async function issueTokens() {
         <p style="font: 400 20px/1.2 var(--serif); margin:0 0 10px; color:var(--refused)">Refused by the token</p>
         <p class="hint">${error.message} <span class="mono-sm">(contract error #${error.code})</span></p>
         <p class="hint" style="margin-top:10px">
-          Nothing reached the ledger: the contract refuses during simulation, so no
-          transaction was ever built. This is the token enforcing its own policy — not the
-          interface declining on its behalf.
+          Refused during simulation — no transaction was ever built.
         </p>`;
       setProgress('mint-progress', '');
     } else {
@@ -289,11 +285,10 @@ async function proveTheGap() {
     el('prove-out').innerHTML = outcome.ok
       ? `<p style="font:400 19px/1.3 var(--serif); color:var(--refused); margin:0 0 8px">
            ${name} just took the money out.</p>
-         <p class="hint">Their credential is revoked. The token would refuse them — but the
-           rail was never told, so the withdrawal went through. Sync the policy and try again.</p>`
+         <p class="hint">Revoked in the register, never told to the rail. Sync and try again.</p>`
       : `<p class="hint"><span class="badge ok">refused</span> ${outcome.message}</p>
-         <p class="hint" style="margin-top:8px">The rail now enforces the register's decision —
-           including the coupons this holder received before being revoked.</p>`;
+         <p class="hint" style="margin-top:8px">The freeze reaches back over coupons
+           received before the revocation.</p>`;
 
     setProgress('sync-progress', '');
   } catch (error) {
@@ -301,8 +296,8 @@ async function proveTheGap() {
     const message = String(error?.message ?? error);
     el('prove-out').innerHTML = `
       <p class="hint"><span class="badge ok">refused</span> ${message.split('\n')[0]}</p>
-      <p class="hint" style="margin-top:8px">The rail now enforces the register's decision —
-        including the coupons this holder received before being revoked.</p>`;
+      <p class="hint" style="margin-top:8px">The freeze reaches back over coupons
+        received before the revocation.</p>`;
     setProgress('sync-progress', '');
   } finally {
     el('btn-prove').disabled = false;

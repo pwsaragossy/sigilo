@@ -69,14 +69,9 @@ function renderReport(receipt, report) {
     </dl>
 
     <p class="hint" style="margin-top:18px">
-      <em>Proven</em> is checked against the circuit. <em>Attested</em> is declared by
-      whoever produced the receipt — tamper-evident, since altering it breaks the
-      context check, but its truth rests on their word, not on mathematics.
-    </p>
-
-    <p class="hint" style="margin-top:14px">
-      This receipt says nothing about any other payment, this holder's balance,
-      or who else was paid in the same cycle.
+      <em>Proven</em> is checked against the circuit. <em>Attested</em> rests on the
+      prover's word — tamper-evident, not mathematical. This receipt says nothing about
+      any other payment.
     </p>`;
 }
 
@@ -105,8 +100,7 @@ async function verify() {
       <p style="font: 400 22px/1.2 var(--serif); margin:0 0 14px; color:var(--refused)">Refused</p>
       <p class="hint">${error?.message ?? error}</p>
       <p class="hint" style="margin-top:12px">
-        A receipt that has been altered, or that describes a payment this pool never
-        saw, does not verify. There is no partial credit.
+        Altered, or describing a payment this pool never saw. No partial credit.
       </p>`;
     el('verify-progress').textContent = '';
   } finally {

@@ -14,28 +14,6 @@ It is a recording of the real interface driven against testnet by [`app/tools/re
 
 ---
 
-## What is ours, and what is not
-
-Judges at this event will see a lot of demos built on the same two libraries. The line matters, so here it is:
-
-**Not ours.** The privacy pool, its Groth16 circuits, the association-set (ASP) contracts and the web SDK are Nethermind's [stellar-private-payments](https://github.com/NethermindEth/stellar-private-payments). The permissioned-token suite is OpenZeppelin's [RWA / ERC-3643 implementation](https://github.com/OpenZeppelin/stellar-contracts). Both Apache-2.0, both pinned by commit in [NOTICE](NOTICE).
-
-**Ours.** [`contracts/policy-bridge`](contracts/policy-bridge) — the bridge between them, and the argument for why one is needed.
-
-A permissioned token asks an identity register who may hold it. A confidential rail proves, against its association sets, who may spend. Each enforces its own policy correctly, and neither knows about the other: **revoking a holder's credential does nothing to funds already inside the rail.**
-
-The contract closes that gap and, more importantly, closes it without asking anyone to be trusted. It owns both association sets and consults the register before moving either — `grant` fails unless the register verifies the holder, `revoke` fails while it still does. So an operator can neither invent a credential nor manufacture a freeze against an investor in good standing. Their own attempt to reach the trees directly is refused by the network:
-
-```
-error: Missing signing key for account CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID
-```
-
-That account is the contract. It has no private key.
-
-And because the pool checks proofs against the *current* association roots, a freeze reaches backwards over coupons the holder already received.
-
-Also ours: the coupon service (accrual, payment cycle), the three-role demo interface, the local signer, and the deployment scripts.
-
 ## The demonstration
 
 Reproduced on testnet, every hash public.
@@ -65,6 +43,28 @@ The fifth row is the one to open. It is a successful withdrawal by a holder whos
 
 Full sequence and enforcement semantics: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#reference-run). Step-by-step walkthrough: [docs/DEMO.md](docs/DEMO.md).
 
+## What is ours, and what is not
+
+Judges at this event will see a lot of demos built on the same two libraries. The line matters, so here it is:
+
+**Not ours.** The privacy pool, its Groth16 circuits, the association-set (ASP) contracts and the web SDK are Nethermind's [stellar-private-payments](https://github.com/NethermindEth/stellar-private-payments). The permissioned-token suite is OpenZeppelin's [RWA / ERC-3643 implementation](https://github.com/OpenZeppelin/stellar-contracts). Both Apache-2.0, both pinned by commit in [NOTICE](NOTICE).
+
+**Ours.** [`contracts/policy-bridge`](contracts/policy-bridge) — the bridge between them, and the argument for why one is needed.
+
+A permissioned token asks an identity register who may hold it. A confidential rail proves, against its association sets, who may spend. Each enforces its own policy correctly, and neither knows about the other: **revoking a holder's credential does nothing to funds already inside the rail.**
+
+The contract closes that gap and, more importantly, closes it without asking anyone to be trusted. It owns both association sets and consults the register before moving either — `grant` fails unless the register verifies the holder, `revoke` fails while it still does. So an operator can neither invent a credential nor manufacture a freeze against an investor in good standing. Their own attempt to reach the trees directly is refused by the network:
+
+```
+error: Missing signing key for account CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID
+```
+
+That account is the contract. It has no private key.
+
+And because the pool checks proofs against the *current* association roots, a freeze reaches backwards over coupons the holder already received.
+
+Also ours: the coupon service (accrual, payment cycle), the three-role demo interface, the local signer, and the deployment scripts.
+
 ## What is hidden, and what is not
 
 Confidentiality, not anonymity. Being precise about the boundary is the point — an enterprise reader will find these anyway.
@@ -82,7 +82,7 @@ Two more limits worth stating plainly:
 
 **Revocation is retroactive and total.** A blocklisted holder cannot spend *anything* in the pool, including coupons received before the revocation. This is deliberate and re-credentialing lifts it, but a payment to a revoked holder is best described as held in treasury until they are re-credentialed, not as excluded.
 
-**The bridge is trusted.** It runs as an issuer-side service with admin rights over the association sets. Nothing on-chain forces it to mirror the register faithfully. The contract that would remove that discretion — a `PolicyBridge` performing a cross-contract `is_verified` check before touching a tree — is specified in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), not implemented.
+**The leaf derivation is trusted.** The contract removed the operator's discretion over *whether* a tree moves, but not over *what* goes into it. An allowlist leaf is `poseidon2(note_public_key, asp_secret)`, computed off-chain because the ASP secret belongs to the holder and the contract never sees it. So the guarantee is that no leaf is inserted for an address the register refuses — not that a given leaf corresponds to the holder named alongside it. Closing that means proving the derivation on-chain, which is a larger piece of work than this one.
 
 **Enrolment needs the holder's consent.** An allowlist leaf commits to the holder's ASP secret, which is theirs. Handing it over is what makes them identifiable to the policy operator; the demo takes it from the CLI's local state, a real deployment would collect it during onboarding.
 

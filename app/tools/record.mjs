@@ -113,7 +113,7 @@ async function act1(page) {
 
   mark('act1');
   await assertScene(page, 'inv3 starts credentialed', () =>
-    document.querySelector('[data-holder="inv3"]').cells[3].textContent.includes('valid'));
+    document.querySelector('[data-holder="inv3"] [data-credential]').textContent.includes('valid'));
 
   // Issue to a credentialed holder: accepted.
   await selectHolder(page, '#mint-to', 'inv3');
@@ -135,7 +135,8 @@ async function act1(page) {
   mark('act1_revoked');
   await assertScene(page, 'inv3 is revoked in the register but still allowed on the rail', () => {
     const row = document.querySelector('[data-holder="inv3"]');
-    return row.cells[3].textContent.includes('revoked') && row.cells[4].textContent.includes('allowed');
+    return row.querySelector('[data-credential]').textContent.includes('revoked') &&
+           row.querySelector('[data-spend]').textContent.includes('allowed');
   });
   await hold(page, 4);   // the "out of step — sync" row is the point
 
@@ -203,9 +204,9 @@ async function act2(page) {
   mark('gap');
   await assertScene(page, 'the register and the rail disagree', () => {
     const row = document.querySelector('[data-holder="inv5"]');
-    return row.cells[3].textContent.includes('revoked') &&
-           row.cells[4].textContent.includes('allowed') &&
-           row.cells[4].textContent.includes('out of step');
+    const spend = row.querySelector('[data-spend]').textContent;
+    return row.querySelector('[data-credential]').textContent.includes('revoked') &&
+           spend.includes('allowed') && spend.includes('out of step');
   });
   await hold(page, 6);   // REVOKED / ALLOWED / out of step — the gap
 
@@ -214,7 +215,7 @@ async function act2(page) {
     /applied|already match|failed/.test(document.getElementById('sync-progress').textContent));
   mark('frozen');
   await assertScene(page, 'the rail now agrees — inv5 is frozen', () =>
-    document.querySelector('[data-holder="inv5"]').cells[4].textContent.includes('frozen'));
+    document.querySelector('[data-holder="inv5"] [data-spend]').textContent.includes('frozen'));
   await hold(page, 5);   // now FROZEN
 }
 

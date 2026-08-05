@@ -70,8 +70,7 @@ function renderPrivate(notes) {
       </tbody>
     </table>
     <p class="hint" style="margin-top:14px">
-      These amounts exist nowhere on the ledger in readable form. They are recovered
-      from the note ciphertexts with this holder's key.
+      Recovered from the note ciphertexts with this holder's key.
     </p>`;
 }
 

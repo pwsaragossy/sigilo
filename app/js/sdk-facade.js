@@ -16,7 +16,16 @@ import init, {
 } from 'stellar-private-payments';
 
 export const TX_PROGRESS_EVENT = 'stellar-private-payments:tx-progress';
-export const DB_LOCKED_MARKER = "Another tab or window is using this app's local database";
+
+// A second tab is the only thing that realistically stops storage from opening, but
+// the SDK reports it three ways depending on where the OPFS handle collides: its own
+// friendly message, the raw DOMException, or a generic init failure. Matching only the
+// friendly one leaves the other two telling the reader nothing they can act on.
+const DB_LOCKED_SIGNATURES = [
+  "Another tab or window is using this app's local database",
+  'NoModificationAllowedError',
+  'Failed to initialize local database storage',
+];
 
 let wasmReady = false;
 let storageHandle = null;
@@ -123,5 +132,6 @@ export function describeResult(result) {
 }
 
 export function isDbLocked(error) {
-  return String(error?.message ?? error).includes(DB_LOCKED_MARKER);
+  const text = String(error?.message ?? error);
+  return DB_LOCKED_SIGNATURES.some((s) => text.includes(s));
 }

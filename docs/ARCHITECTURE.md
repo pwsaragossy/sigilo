@@ -196,8 +196,9 @@ that secret over is what makes them identifiable to the policy operator. In this
 bridge reads it from the rail CLI's local state; a real deployment would collect it during
 onboarding, and the holder would know it had.
 
-The operator remains trusted to mirror the registry faithfully — see the `PolicyBridge`
-contract sketched above, which removes that discretion by making the check happen on-chain.
+The operator no longer has discretion over whether a tree moves — the `PolicyBridge` contract
+above re-checks the register on-chain before either insertion, and the trees answer to nobody
+else. What is still taken on faith is the leaf itself; see [What remains trusted](#what-remains-trusted).
 
 ## Reference run
 

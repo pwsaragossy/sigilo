@@ -193,25 +193,35 @@ section[role='tabpanel'][hidden] { display: none; }
 @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
 
 /* ---------- the bridge ----------
-   Two systems and the link between them. When they disagree the link breaks, because
-   that disagreement is the whole reason this project exists. */
+   Two systems and the link between them, as the header of one table. The grouping row
+   names which question each column answers; when the two disagree the link breaks,
+   because that disagreement is the whole reason this project exists. */
 
 .panel.bridge { border-color: #2a2f3a; }
 
-.bridge-grid {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 18px;
-  margin-bottom: 20px;
+/* The grouping row sits above the column names, so it carries the system, not a label. */
+tr.systems th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 14px;
+  color: var(--vellum);
+  border-bottom: 0;
+  padding-bottom: 14px;
+  vertical-align: bottom;
+}
+tr.systems td { border-bottom: 0; padding: 0; }
+
+.side-sub {
+  color: var(--vellum-faint);
+  font-size: 11px;
+  margin-top: 3px;
+  text-transform: none;
+  letter-spacing: 0.03em;
 }
 
-.side-title { color: var(--vellum); font-size: 14px; letter-spacing: 0.02em; }
-.side-sub { color: var(--vellum-faint); font-size: 11px; margin-top: 3px; }
-.bridge-grid .side:last-child { text-align: right; }
-
 .link {
-  width: 96px;
+  width: 100%;
+  min-width: 44px;
   height: 2px;
   background: var(--verified);
   position: relative;
@@ -239,13 +249,7 @@ section[role='tabpanel'][hidden] { display: none; }
 td.link-cell { text-align: center; color: var(--verified); letter-spacing: 0.1em; }
 td.link-cell[data-broken] { color: var(--refused); }
 
-.bridge-state {
-  margin-top: 14px;
-  font-size: 13px;
-  color: var(--vellum-dim);
-  line-height: 1.6;
-}
-.bridge-state strong { color: var(--refused); }
+.out-of-step { color: var(--seal); margin-top: 5px; }
 
 /* ---------- tables ---------- */
 

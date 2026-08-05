@@ -30,9 +30,9 @@ The page opens on the **Issuer** tab. Three tabs across the top — Issuer, Inve
 
 | # | Do this | What happens |
 |---|---|---|
-| 1 | Look at **Holders & credentials** | Five investors, each with a position and a KYC credential. `VALID` / `ALLOWED` across the board |
-| 2 | In **Issue tokens**, pick `inv3`, click **Issue** | ~5s → green `ACCEPTED`. A transaction hash appears under Activity |
-| 3 | Back in the holders table, click **Revoke** on `inv3` | ~8s → the credential turns `REVOKED`. Note the rail column still says `ALLOWED`, with **out of step — sync** beneath it |
+| 1 | Look at **Policy — one credential, two systems** | One row per investor, and two verdicts on each row: `valid` under *identity register*, `allowed` under *confidential rail*, linked by `───` in the middle |
+| 2 | In **Issue tokens**, pick `inv3`, click **Issue** | ~5s → `accepted`. A transaction hash appears under Activity |
+| 3 | Back in the policy table, click **Revoke** on `inv3` | ~8s → the credential turns `revoked`, but the rail still says `allowed`, the link between them breaks to `╳`, and **out of step — sync** appears under the rail verdict |
 | 4 | Click **Issue** again, still on `inv3` | ~5s → **Refused by the token**, *"the registry knows this address, but its claims no longer verify (#304)"* |
 
 **The point of step 4:** nothing reached the ledger. The contract itself refused, during simulation — this is not the interface declining on the token's behalf. A permissioned asset is one that cannot move to someone who is not allowed to hold it, and that is enforced where it counts.
@@ -49,9 +49,9 @@ Leave `inv3` revoked. Act 2 continues from here.
 
 | # | Do this | What happens |
 |---|---|---|
-| 1 | Click **Restore** on `inv3`, then **Sync compliance policy** | ~8s + ~15s → everyone back to `VALID` / `ALLOWED` |
+| 1 | Click **Restore** on `inv3`, then **Sync policy** | ~8s + ~15s → everyone back to `valid` / `allowed`, every link `───` |
 | 2 | Look at **Coupon cycle** | Five amounts, none proportional to the positions — each accrues from that holder's own entry date |
-| 3 | Click **Pay coupon cycle** | **~75 seconds.** Five confidential payments, each with its own proof. Watch the status column turn `PAID` one by one and the hashes stack up under Activity |
+| 3 | Click **Pay coupon cycle** | **~75 seconds.** Five confidential payments, each with its own proof. Watch the status column turn `paid` one by one and the hashes stack up under Activity |
 | 4 | Open any of those hashes on the explorer | An `invoke_host_function` call. **No amount anywhere in it.** Search the page for `119.34` or `287.25` — nothing |
 | 5 | Switch to the **Investor** tab, pick `inv4` | ~10s → `287.25625 XLM — decrypted locally`. The exact number the issuer computed, recovered from the note's ciphertext with this holder's key |
 
@@ -61,11 +61,12 @@ Leave `inv3` revoked. Act 2 continues from here.
 
 | # | Do this | What happens |
 |---|---|---|
-| 1 | Issuer tab → **Revoke** on `inv5` | ~8s → `REVOKED` / `ALLOWED` / **out of step — sync** |
+| 1 | Issuer tab → **Revoke** on `inv5` | ~8s → `revoked` / `╳` / `allowed` + **out of step — sync** |
 | 2 | Stop and read that row | The credential is gone from the register. **The rail has not been told.** Right now `inv5` can still spend the coupon they already hold |
-| 3 | Click **Sync compliance policy** | ~15s → the row turns `FROZEN`. Activity shows *"inv5: credential absent → blocklisted (pool balance frozen)"* |
+| 3 | Click **Prove it — withdraw as the revoked holder** | ~20s → *"inv5 just took the money out."* The withdrawal is a real testnet transaction, by a holder whose credential is already revoked. This is the gap, spent rather than described |
+| 4 | Click **Sync policy** | ~15s → the row turns `frozen`, the link closes to `───`, and the **Prove it** button disappears: there is no gap left to prove. Off screen, the same withdrawal is now refused — *"user note key exists in non-membership tree"*, recorded in the [reference run](ARCHITECTURE.md#reference-run) |
 
-**Step 2 is why this project exists.** A permissioned token and a confidential rail each enforce their own policy perfectly well, and neither knows about the other. Revoking a credential does nothing to money already inside the rail — an issuer who revokes a holder has revoked nothing where it matters. The bridge is what makes the second follow the first.
+**Steps 2 and 3 are why this project exists.** A permissioned token and a confidential rail each enforce their own policy perfectly well, and neither knows about the other. Revoking a credential does nothing to money already inside the rail — an issuer who revokes a holder has revoked nothing where it matters. The bridge is what makes the second follow the first.
 
 And the freeze reaches backwards: because the pool checks proofs against the current association roots, a blocklisted holder cannot spend *anything*, including coupons received before the revocation. Re-credentialing lifts it.
 
@@ -102,7 +103,7 @@ This is the part that makes confidentiality acceptable rather than suspicious. H
 | *"Another tab has this demo open"* | The rail keeps one exclusive local database | Close the other tab, reload |
 | The investor shows more coupons than expected | Notes from a previous run | `./scripts/reset.sh`, then clear site data |
 | A payment fails midway | Usually the treasury ran out of pool funding | Check the balance the reset prints; top up with `spp deposit` (100 XLM per deposit) |
-| *"Not yet enrolled in the association set"* | The holder was never synced | Click **Sync compliance policy** |
+| *"Not yet enrolled in the association set"* | The holder was never synced | Click **Sync policy** |
 | Nothing happens for 15 seconds | Normal — a proof is being computed | Wait. The progress line names the stage |
 
 ## Resetting between runs
