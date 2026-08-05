@@ -266,7 +266,7 @@ th {
 }
 td { padding: 11px 10px 11px 0; border-bottom: 1px solid var(--ink-line); }
 tr:last-child td { border-bottom: 0; }
-td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ---------- the reveal ----------
    A hidden amount is a bar; decrypting lifts it. This is the one moment in the

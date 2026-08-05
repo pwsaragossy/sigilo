@@ -109,7 +109,13 @@ async function handleSync(_req, res) {
 async function serveStatic(req, res) {
   const url = new URL(req.url, 'http://localhost');
   let path = decodeURIComponent(url.pathname);
-  if (path === '/') path = '/app/index.html';
+
+  // Redirect rather than serve: the page's own links are relative to /app/, so
+  // serving it at / leaves the stylesheet and modules resolving one level too high.
+  if (path === '/') {
+    res.writeHead(302, { location: '/app/index.html' }).end();
+    return;
+  }
 
   // Contain traversal: everything must resolve inside the repo.
   const file = resolve(ROOT, '.' + normalize(path));
