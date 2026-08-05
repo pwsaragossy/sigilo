@@ -50,24 +50,53 @@ These are the properties the rail actually provides — not the ones a privacy p
 
 The retroactive freeze is the interesting property for an institutional reader: revocation is not advisory, and it is not partial.
 
-## Trust boundary
+## The bridge is a contract
 
-The bridge runs as an issuer-side service today: it reads the identity registry and calls `insert_leaf` on the association-set contracts, of which it is admin. **Nothing on-chain forces the bridge to mirror the registry faithfully** — an operator could insert a key that holds no KYC claim. This is stated plainly rather than glossed over.
+[`contracts/policy-bridge`](../contracts/policy-bridge) owns both association sets and moves them only after asking the identity register itself. Deployed at
+[`CCCVU6BZ…`](https://stellar.expert/explorer/testnet/contract/CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID).
 
-The upgrade that removes the trust: a `PolicyBridge` contract holding admin over the association sets, whose insertion entrypoint performs a cross-contract `identity_registry.is_verified(address)` check before updating a tree. Then the association set is a *provable* projection of the identity registry, and the operator has no discretion.
+Both directions are gated, which is what makes it more than automation:
 
 ```rust
-// Target interface — specified, not yet implemented.
-pub trait PolicyBridge {
-    /// Insert into the allowlist only if the identity registry
-    /// verifies the address. Reverts otherwise.
-    fn grant(e: &Env, holder: Address, asp_leaf: U256) -> Result<(), Error>;
+pub fn grant(env: Env, holder: Address, leaf: U256) -> Result<(), Error> {
+    Self::operator(&env)?.require_auth();
+    if !Self::registry_verifies(&env, &holder)? {
+        return Err(Error::NotCredentialed);      // cannot invent a credential
+    }
+    // …insert into the allowlist
+}
 
-    /// Insert into the blocklist. Callable when the registry no
-    /// longer verifies the holder.
-    fn revoke(e: &Env, holder: Address, asp_leaf: U256) -> Result<(), Error>;
+pub fn revoke(env: Env, holder: Address, note_key: U256) -> Result<(), Error> {
+    Self::operator(&env)?.require_auth();
+    if Self::registry_verifies(&env, &holder)? {
+        return Err(Error::StillCredentialed);    // cannot manufacture a freeze
+    }
+    // …insert into the blocklist
 }
 ```
+
+The second refusal is the one worth dwelling on. An operator cannot freeze an investor in good standing and call it compliance — the chain will not let them.
+
+**What makes this real rather than decorative** is the handover: the association sets name the contract as their admin, so there is no path to them that skips it. The operator's own attempt is refused by the network, not by convention:
+
+```
+$ stellar contract invoke --id <allowlist> --source issuer -- insert_leaf --leaf 999888777
+error: Missing signing key for account CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID
+```
+
+That account is the contract. It has no private key and never will.
+
+| Attempt | Result |
+|---|---|
+| Operator writes to the allowlist directly | refused — no signing key exists for the contract |
+| `grant` for a credentialed holder | [`b45d2091`](https://stellar.expert/explorer/testnet/tx/b45d2091cfcc) |
+| `revoke` for a holder still in good standing | `Error(Contract, #3)` `StillCredentialed` |
+
+`scripts/policy-bridge.sh` still exists, but its role changed: it proposes, and the contract decides. Its eight tests lead with the refusals, since those are the reason the contract exists.
+
+### What remains trusted
+
+The leaf itself. `poseidon2(note_public_key, asp_secret)` is computed off-chain, because the ASP secret belongs to the holder and the contract never sees it. So the contract guarantees *that no leaf is inserted for an address the register refuses* — not that a given leaf corresponds to the holder named alongside it. Closing that would mean proving the derivation on-chain, which is a larger piece of work than this one.
 
 ## What is confidential, and what is not
 

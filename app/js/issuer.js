@@ -71,6 +71,17 @@ function renderHolders() {
 function renderBridge() {
   const broken = demo.holders.filter(outOfStep);
 
+  // Who enforces this matters more than the table below it. A contract owning the
+  // trees means the operator cannot enrol or freeze anyone against the register;
+  // without one, the same rules hold only because a script behaves.
+  el('bridge-enforcer').innerHTML = demo.policyBridge
+    ? `Enforced on-chain by
+       <a href="${contractUrl(demo.policyBridge)}" target="_blank" rel="noopener">${short(demo.policyBridge, 8, 6)}</a>,
+       which owns both association sets and consults the register before moving either.
+       The issuer cannot reach them directly — <em>the contract has no private key</em>.`
+    : `Kept in step by an off-chain service. Nothing on-chain compels it to mirror the
+       register faithfully — deploy the PolicyBridge contract to remove that trust.`;
+
   el('bridge-table').querySelector('tbody').innerHTML = demo.holders.map((h) => `
     <tr data-bridge="${h.name}">
       <td>${h.name}</td>

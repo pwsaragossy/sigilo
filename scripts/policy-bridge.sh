@@ -45,6 +45,12 @@ ASP_ALLOW=$(jq -r '.asp_membership' "$RAIL_STATE")
 ASP_BLOCK=$(jq -r '.asp_non_membership' "$RAIL_STATE")
 POOL=$(jq -r '.pools[0].poolContractId' "$RAIL_STATE")
 
+# The PolicyBridge contract owns the association sets. This script can no longer
+# touch them: it proposes, and the contract decides, re-checking the register
+# itself before it moves anything.
+BRIDGE=$(jq -r '.policyBridge // empty' "$RWA_STATE")
+[[ -n "$BRIDGE" ]] || die "no policyBridge in .demo-state/rwa.json — deploy it with scripts/deploy-bridge.sh"
+
 SPP_CLI="$SPP_REPO/target/release/spp"
 CIRCUITS="$SPP_REPO/target/circuits-artifacts/release"
 [[ -x "$SPP_CLI" ]] || die "build the rail CLI first: cargo build --release -p stellar-private-payments-cli"
@@ -75,6 +81,18 @@ note_key_decimal() {
 is_credentialed() {  # is_credentialed <stellar account alias>
   stellar contract invoke "${NET[@]}" --id "$VERIFIER" --source "$ADMIN" --send=no \
     -- verify_identity --account "$1" >/dev/null 2>&1
+}
+
+
+# Asks the contract to act.
+#
+# The contract owns the association sets, so this is the only way in — and it
+# re-checks the register before touching anything. A wrong proposal here is
+# refused on-chain rather than quietly applied, which is the difference between
+# this script being trusted and being merely convenient.
+bridge_call() {  # bridge_call <grant|revoke|restore> <args...>
+  local action="$1"; shift
+  stellar contract invoke "${NET[@]}" --id "$BRIDGE" --source "$ADMIN" -- "$action" "$@" >/dev/null 2>&1
 }
 
 is_blocklisted() {  # is_blocklisted <note_key_decimal>
@@ -139,6 +157,9 @@ cmd_sync() {
     [[ -n "$leaf" ]] || die "$name is not enrolled — run 'enroll' first"
     note_dec=$(note_key_decimal "$(policy_get "$name" note_key)")
 
+    local holder
+    holder=$(jq -r --arg n "$name" '.holders[]|select(.name==$n)|.address' "$RWA_STATE")
+
     if is_credentialed "$alias"; then
       # Credential is valid: ensure allowlisted, and lift any freeze.
       if [[ "$(policy_get "$name" allowlisted)" != "true" ]]; then
@@ -146,8 +167,7 @@ cmd_sync() {
         # re-insert is the only way to find out it was already there. Treat that
         # as success: the invariant we want is "leaf is present", not "we put it
         # there this run".
-        if stellar contract invoke "${NET[@]}" --id "$ASP_ALLOW" --source "$ADMIN" \
-             -- insert_leaf --leaf "$leaf" >/dev/null 2>&1; then
+        if bridge_call grant --holder "$holder" --leaf "$leaf"; then
           echo "  $name: credential valid → added to allowlist"
         else
           echo "  $name: credential valid → already in allowlist"
@@ -156,8 +176,7 @@ cmd_sync() {
         changes=$((changes + 1))
       fi
       if is_blocklisted "$note_dec"; then
-        stellar contract invoke "${NET[@]}" --id "$ASP_BLOCK" --source "$ADMIN" \
-          -- delete_leaf --key "$note_dec" >/dev/null 2>&1
+        bridge_call restore --holder "$holder" --note_key "$note_dec" || true
         policy_set "$name" blocked false
         echo "  $name: credential restored → unfrozen"
         changes=$((changes + 1))
@@ -167,8 +186,7 @@ cmd_sync() {
       # blocklist is the only lever — and it is the stronger one, since the pool
       # rejects proofs against a stale root.
       if ! is_blocklisted "$note_dec"; then
-        stellar contract invoke "${NET[@]}" --id "$ASP_BLOCK" --source "$ADMIN" \
-          -- insert_leaf --key "$note_dec" --value 1 >/dev/null 2>&1
+        bridge_call revoke --holder "$holder" --note_key "$note_dec" || true
         policy_set "$name" blocked true
         echo "  $name: credential absent → blocklisted (pool balance frozen)"
         changes=$((changes + 1))

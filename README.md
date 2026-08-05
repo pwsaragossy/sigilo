@@ -20,9 +20,19 @@ Judges at this event will see a lot of demos built on the same two libraries. Th
 
 **Not ours.** The privacy pool, its Groth16 circuits, the association-set (ASP) contracts and the web SDK are Nethermind's [stellar-private-payments](https://github.com/NethermindEth/stellar-private-payments). The permissioned-token suite is OpenZeppelin's [RWA / ERC-3643 implementation](https://github.com/OpenZeppelin/stellar-contracts). Both Apache-2.0, both pinned by commit in [NOTICE](NOTICE).
 
-**Ours.** The bridge between them — and the argument for why one is needed.
+**Ours.** [`contracts/policy-bridge`](contracts/policy-bridge) — the bridge between them, and the argument for why one is needed.
 
-A permissioned token asks an identity register who may hold it. A confidential rail proves, against its association sets, who may spend. Each enforces its own policy correctly, and neither knows about the other: **revoking a holder's credential does nothing to funds already inside the rail.** [`scripts/policy-bridge.sh`](scripts/policy-bridge.sh) closes that gap by making the association sets follow the register — grant puts a holder in the allowlist, revocation puts them in the blocklist, and because the pool checks proofs against the *current* roots, the freeze reaches backwards over coupons they already hold.
+A permissioned token asks an identity register who may hold it. A confidential rail proves, against its association sets, who may spend. Each enforces its own policy correctly, and neither knows about the other: **revoking a holder's credential does nothing to funds already inside the rail.**
+
+The contract closes that gap and, more importantly, closes it without asking anyone to be trusted. It owns both association sets and consults the register before moving either — `grant` fails unless the register verifies the holder, `revoke` fails while it still does. So an operator can neither invent a credential nor manufacture a freeze against an investor in good standing. Their own attempt to reach the trees directly is refused by the network:
+
+```
+error: Missing signing key for account CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID
+```
+
+That account is the contract. It has no private key.
+
+And because the pool checks proofs against the *current* association roots, a freeze reaches backwards over coupons the holder already received.
 
 Also ours: the coupon service (accrual, payment cycle), the three-role demo interface, the local signer, and the deployment scripts.
 

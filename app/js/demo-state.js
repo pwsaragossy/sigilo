@@ -44,6 +44,9 @@ export async function loadDemoState() {
     token: rwa.token,
     identity: rwa.identity,
     compliance: rwa.compliance,
+    // The contract that owns the association sets. Its presence is what makes the
+    // policy a rule rather than a promise, so the interface says which one is in force.
+    policyBridge: rwa.policyBridge ?? null,
     issuer: { address: rwa.admin, secret: keys.issuer?.secret },
     treasury: { address: rwa.treasury, secret: keys.treasury?.secret },
     rail: {
