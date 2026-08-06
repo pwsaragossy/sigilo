@@ -4,6 +4,39 @@ Written to be followed by someone who did not build this. Every click is listed,
 
 ---
 
+## First-time setup
+
+Deploying your own instance, once. If the rail is already deployed, skip to [Before you start](#before-you-start).
+
+Needs the Stellar CLI, Rust, Node 22+, `jq`, and clones of the two upstream repositories at the pinned commits.
+
+```bash
+export OZ_REPO=/path/to/stellar-contracts      # 9b5ed96, built to target/wasm32v1-none/release
+export SPP_REPO=/path/to/stellar-private-payments   # 461c1d0
+
+./scripts/deploy-rwa.sh          # permissioned token, identities, signed KYC claims
+./scripts/export-demo-keys.sh    # throwaway signing keys for the browser
+./scripts/policy-bridge.sh enroll
+./scripts/policy-bridge.sh sync  # allow-list and blocklist follow the registry
+
+cd app && ./build.sh && cd ..
+node app/server.mjs              # → http://localhost:8080/app/index.html
+                                 #   holder's wallet: /app/wallet.html
+```
+
+The confidential payment pool also needs its own instance — the reference deployment's allow-list and blocklist are admin-gated by their deployer, so grant and revoke are not available on it. `deployments/scripts/deploy.sh` in `$SPP_REPO` deploys one; the web SDK embeds its deployment at compile time, so it must then be rebuilt against yours ([vendor/spp-sdk-web/README.md](../vendor/spp-sdk-web/README.md) has the steps, including the macOS clang fix that upstream's guide omits).
+
+**On macOS**, the SDK compiles SQLite to wasm and Apple clang has no wasm backend:
+
+```bash
+brew install llvm
+export CC_wasm32_unknown_unknown=$(brew --prefix llvm)/bin/clang
+```
+
+Demo configuration — local seed keys, the server-side admin key, and the single-page storage lock — is declared [below](#demo-configuration-declared).
+
+---
+
 ## Before you start
 
 ```bash

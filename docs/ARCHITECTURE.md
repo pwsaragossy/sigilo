@@ -161,6 +161,14 @@ price of the same one-way door that locks the operator out of the trees.
 
 Confidentiality, not anonymity: addresses transacting with the pool remain visible; amounts do not.
 
+### The trade-offs behind those rows
+
+Each is a decision, not an oversight, and each is stated as what was traded for what. Two more — the leaf at `grant` and the note key at `revoke` — are in [What remains trusted](#what-remains-trusted); consent is in [Enrolment and its trust boundary](#enrolment-and-its-trust-boundary).
+
+**Membership is public, and the set is small.** This deployment has five holders. A regulated issuance has tens, not tens of thousands, and every association-root transition is a public subtraction against that set — so a revocation is a timestamped, attributable event. Amounts stay hidden; membership does not. That is the correct shape for a securities register and the wrong shape for a mixer, and Sigilo is the first one. Pooling across issuers would enlarge the set, and immediately raises whose policy binds whom — unsolved here, and named rather than papered over.
+
+**Revocation is retroactive and total, and that is the point.** A blocklisted holder cannot spend *anything* in the pool, including coupons received before the revocation. Surgical revocation would leave a sanctioned holder free to spend every pre-revocation coupon — exactly the failure this project exists to prevent. The cost is that a payment to a revoked holder is best described as held until they are re-credentialed, not as excluded. Re-credentialing lifts it.
+
 ## Selective disclosure
 
 Two paths to an auditor, with different guarantees:
@@ -332,3 +340,13 @@ Assert *who* the admin is, not merely that you are refused. A refusal is equally
 **From then on**, `grant(holder, leaf, note_key)`, `revoke(holder)` and `restore(holder)` replace every direct write. Each asks the registry first and refuses to contradict it — `grant` fails with `NotCredentialed` (#2), `revoke` fails with `StillCredentialed` (#3), either fails with `VerifierUnavailable` (#6) when the register cannot be reached. `revoke` and `restore` take no key: they act on the `Enrolment` recorded at `grant`, so the key frozen is always the one the register approved, and `NoteKeyBound` (#7) stops two holders claiming one key. `enrolment(holder)` and `is_credentialed(holder)` are public reads, so anyone can check both the binding and the decision the contract acted on, and every state change emits a `PolicyChanged` event carrying the action, the holder and both keys — so an auditor reconstructs who was enrolled or frozen, when, and *which key moved*, without asking you.
 
 **The honest limit on portability.** Those function names and arities are how the contract talks to its neighbours, and they match Nethermind's ASP contracts and OpenZeppelin's verifier at the pinned commits. Different components mean editing those call sites — the pattern transfers, the exact invocations may not. And this is testnet work on unaudited alpha dependencies: adopt the design, not this build, for anything holding real value.
+
+## The holder's wallet
+
+[`app/wallet.html`](../app/wallet.html) is the same rail told from the holder's end. What it adds over the demo's Investor tab, and the guarantees behind each part:
+
+The demo's Investor tab shows the same balance from inside the issuer's story. This page is the holder's own, which is why the checks a holder runs against their own key live here and not there.
+
+**Disclosure is theirs to give.** The holder picks one payment and proves that payment: the circuit requires the note's spending key, so not even the issuer can produce it on their behalf. Each disclosed field is marked **proven** or **attested**, because a zero-knowledge proof and a claim someone made are different objects and a receipt that blurs them is worse than no receipt. Raise the claimed amount by one digit and the verdict flips to Refused with `Proof: no` while the other checks still pass — the panel says which guarantee broke, not merely that one did.
+
+**The enrolment is checkable by the person it was done to.** The wallet re-derives the allow-list leaf standing in the holder's name from their own key and compares it, which is what turns [the leaf trade-off](#the-trade-offs-behind-those-rows) into something detectable rather than something to be told. The secret behind it never reaches the page and the issuer never holds it, so a match means nobody enrolled a stranger in their place. It lives here and nowhere else — a check on your own key belongs on your own page, and one copy cannot drift from another.
