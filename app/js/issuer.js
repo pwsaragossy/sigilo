@@ -6,7 +6,7 @@
 // holder can still spend — which is exactly what the bridge exists to close.
 
 import {
-  loadDemoState, fetchLiveState, NETWORK_PASSPHRASE, COUPON,
+  loadDemoState, fetchLiveState, invalidateLiveState, NETWORK_PASSPHRASE, COUPON,
   accruedCoupon, toStroops, fromStroops, fmt, short, txUrl, contractUrl,
 } from './demo-state.js';
 import {
@@ -460,7 +460,13 @@ async function payCycle() {
   }
 }
 
-const refreshPolicyState = () => fetchLiveState(demo);
+/**
+ * A fresh read, for after something moved. The initial mount deliberately does
+ * not use this: it shares the read with the investor panel, and invalidating
+ * there would have the two panels run /api/status twice, concurrently, for the
+ * same answer — each run simulates two contract calls per holder.
+ */
+const refreshPolicyState = () => { invalidateLiveState(); return fetchLiveState(demo); };
 
 export async function mountIssuer(state) {
   demo = state ?? (await loadDemoState());
@@ -473,7 +479,8 @@ export async function mountIssuer(state) {
 
   // Until this lands every credential reads "checking…". If it never lands, it
   // keeps reading that — the seed cannot answer this question and must not try.
-  const live = await refreshPolicyState();
+  // Shared with the investor panel rather than invalidated: same answer, one run.
+  const live = await fetchLiveState(demo);
   renderHolders();
   renderBridge();
   renderCoupons();

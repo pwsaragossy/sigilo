@@ -91,20 +91,33 @@ export async function loadDemoState() {
  * that gets `false` still has `credentialValid: null` and must say so rather
  * than pick a side.
  */
-export async function fetchLiveState(state) {
-  try {
-    const res = await fetch('/api/status');
-    const out = await res.json();
-    if (!res.ok) return false;
+let liveRead = null;
+
+export function fetchLiveState(state) {
+  // Shared, not repeated: /api/status simulates two contract calls per holder and
+  // takes tens of seconds. Three panels asking at once used to mean three runs.
+  liveRead ??= (async () => {
+    try {
+      const res = await fetch('/api/status');
+      const out = await res.json();
+      if (!res.ok) return null;
+      return out.holders ?? null;
+    } catch {
+      return null;
+    }
+  })();
+
+  return liveRead.then((holders) => {
+    if (!holders) return false;
     for (const holder of state.holders) {
-      const live = out.holders?.[holder.name];
-      if (live) Object.assign(holder, live);
+      if (holders[holder.name]) Object.assign(holder, holders[holder.name]);
     }
     return true;
-  } catch {
-    return false;
-  }
+  });
 }
+
+/** Forces the next fetchLiveState to ask again — after a sync has moved things. */
+export const invalidateLiveState = () => { liveRead = null; };
 
 /**
  * Coupon owed to a holder, accrued from the date they entered.

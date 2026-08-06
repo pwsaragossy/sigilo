@@ -5,7 +5,7 @@
 // the position was never secret, the payment always was.
 
 import {
-  loadDemoState, NETWORK_PASSPHRASE, COUPON,
+  loadDemoState, fetchLiveState, NETWORK_PASSPHRASE, COUPON,
   fromStroops, fmt, short, contractUrl, accruedCoupon,
 } from './demo-state.js';
 import { openAccount, pool as openPool, onProgress } from './sdk-facade.js';
@@ -194,6 +194,13 @@ export async function mountInvestor(state) {
   });
 
   el('btn-disclose').addEventListener('click', generateReceipt);
+
+  // The credential renders before the register has answered, so repaint when it
+  // does. Without this the badge sat on "checking…" for the whole session — the
+  // panel had no reason of its own to look again.
+  fetchLiveState(demo).then((live) => {
+    if (live && current) renderPublic(current.holder);
+  });
 
   await selectHolder(demo.holders[0].name, { announce: false });
 }
