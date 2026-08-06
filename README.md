@@ -11,7 +11,7 @@ The submission form held a repository and a video. Everything else it could not 
 
 | | |
 |---|---|
-| **Demo video**, and the argument it makes | [`docs/video/sigilo-demo.mp4`](docs/video/sigilo-demo.mp4) · [captions](docs/video/captions.md) |
+| **Demo video**, and the argument it makes | [watch on Drive](https://drive.google.com/file/d/1hdKdjdJBrwp1TQSe635KDed2wif6lkwv/view) |
 | **Run it yourself**, every click listed | [docs/DEMO.md](docs/DEMO.md) |
 | **Architecture**, with the full reference run | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — every hash public |
 | **The contract that is ours**, live on testnet | [`contracts/policy-bridge`](contracts/policy-bridge) · [`CD63ZKLY…`](https://stellar.expert/explorer/testnet/contract/CD63ZKLYQ2I3O3EJRAHIMPZQO424VGZHOG7INSY7IY3BYJZI2D6RHXRU) |
