@@ -26,6 +26,11 @@
   <div class="brand">
     <h1>Sigilo</h1>
     <span class="tag">one credential, two enforcement points · stellar testnet</span>
+    <!--
+      Deliberately not target="_blank": the payment SDK holds an exclusive OPFS
+      lock, so a second tab would evict this one. Navigating away releases it.
+    -->
+    <a class="leave" href="wallet.html">Holder's wallet &rarr;</a>
   </div>
 
   <!--

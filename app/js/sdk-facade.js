@@ -27,6 +27,17 @@ const DB_LOCKED_SIGNATURES = [
   'Failed to initialize local database storage',
 ];
 
+// Claimed for the lifetime of whichever page opens storage first. The SDK's own
+// collision is a ~30s timeout deep inside a worker that never settles the promise
+// we awaited, so the page sits on "opening…" forever with the real cause only in
+// the console. Asking the browser first turns that into an immediate, legible
+// refusal — and it is the platform's own primitive, not a lock of our own making.
+const STORAGE_LOCK = 'sigilo:spp-storage';
+
+// Long enough that a reload's own teardown is not mistaken for a second tab,
+// short enough that a real collision is named before anyone starts waiting.
+const LOCK_GRACE_MS = 1500;
+
 let wasmReady = false;
 let storageHandle = null;
 let clientHandle = null;
@@ -39,10 +50,51 @@ async function ensureWasm() {
   }
 }
 
-/** Opens the one storage worker this page gets. Cold start can take ~15s. */
+/**
+ * Takes the storage lock, or reports that another page holds it.
+ *
+ * Held until this document goes away — the browser releases it on unload, which is
+ * why the callback never returns. Anything unexpected (no Web Locks, a rejection
+ * that is not our own abort) resolves true: a guard that blocks a working page is
+ * worse than the bug it guards against.
+ */
+function claimStorageLock() {
+  if (!navigator.locks) return Promise.resolve(true);
+
+  return new Promise((settle) => {
+    const giveUp = new AbortController();
+    const timer = setTimeout(() => giveUp.abort(), LOCK_GRACE_MS);
+
+    navigator.locks
+      .request(STORAGE_LOCK, { mode: 'exclusive', signal: giveUp.signal }, () => {
+        clearTimeout(timer);
+        settle(true);
+        return new Promise(() => {});   // never resolves: the lock is ours until unload
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        settle(error?.name !== 'AbortError');
+      });
+  });
+}
+
+/**
+ * Opens the one storage worker this page gets. Cold start can take ~15s.
+ *
+ * Verification does not come through here — `verifyDisclosure` needs only wasm — so
+ * a second tab can still check a receipt while the first holds the database.
+ */
 export async function ensureStorage() {
   await ensureWasm();
-  if (!storageHandle) storageHandle = await Storage.open();
+  if (!storageHandle) {
+    if (!(await claimStorageLock())) {
+      throw new Error(
+        "Another tab or window is using this app's local database. "
+        + 'The confidential payment SDK keeps exactly one — close the other tab and reload.',
+      );
+    }
+    storageHandle = await Storage.open();
+  }
   return storageHandle;
 }
 

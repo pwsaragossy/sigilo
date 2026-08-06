@@ -53,6 +53,9 @@ header {
   font: 400 30px/1 var(--serif);
   letter-spacing: 0.04em;
   margin: 0;
+  /* The masthead never wraps: adding the wallet link made flex shrink it first. */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .brand .tag {
@@ -61,6 +64,18 @@ header {
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
+
+/* The one link that leaves the page. Right-aligned and outside the tablist,
+   because it is not a fourth role — it is the same rail, told from the other end. */
+.brand a.leave {
+  margin-left: auto;
+  color: var(--vellum-dim);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  border-bottom-color: var(--ink-line);
+  white-space: nowrap;
+}
+.brand a.leave:hover { color: var(--seal); }
 
 .roles {
   display: flex;

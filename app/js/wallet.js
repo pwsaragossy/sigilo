@@ -16,7 +16,7 @@ import {
 } from './demo-state.js';
 import {
   initRuntime, openAccount, pool as openPool, resolveRecipient,
-  onProgress, describeResult, isDbLocked, client,
+  onProgress, describeResult, isDbLocked,
 } from './sdk-facade.js';
 import { LocalSigner } from './local-signer.js';
 import { mountAuditor } from './auditor.js';

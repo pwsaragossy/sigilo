@@ -166,6 +166,7 @@ export SPP_REPO=/path/to/stellar-private-payments   # 461c1d0
 
 cd app && ./build.sh && cd ..
 node app/server.mjs              # → http://localhost:8080/app/index.html
+                                 #   holder's wallet: /app/wallet.html
 ```
 
 The confidential payment pool also needs its own instance — the reference deployment's allow-list and blocklist are admin-gated by their deployer, so grant and revoke are not available on it. `deployments/scripts/deploy.sh` in `$SPP_REPO` deploys one; the web SDK embeds its deployment at compile time, so it must then be rebuilt against yours ([vendor/spp-sdk-web/README.md](vendor/spp-sdk-web/README.md) has the steps, including the macOS clang fix that upstream's guide omits).
@@ -187,7 +188,7 @@ The three roles share one page because they must: the payment SDK's storage hold
 
 ## The holder's side
 
-The same system, told from the wallet end — what a holder controls, and what they can check without asking anyone.
+The same system, told from the wallet end — what a holder controls, and what they can check without asking anyone. It has its own page: **[`app/wallet.html`](app/wallet.html)** — a confidential balance, a private send, a withdrawal the policy gate can refuse, and a receipt that proves one payment. Linked from the demo's header; it navigates rather than opening a tab, because the payment SDK's storage lock allows one page at a time.
 
 **The membership secret is theirs.** Proving membership in the allow-list needs a secret derived from the holder's own key. The issuer never holds it and the page never sees it: the Investor view calls `deriveAspUserLeaf()` on the holder's own account and compares the result to the leaf standing on record. If they match, the enrolment made in their name is genuinely theirs — nobody enrolled a stranger in their place. This is what turns the trust assumption above into something the holder can detect rather than be told about.
 
