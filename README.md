@@ -5,6 +5,20 @@
 Enterprise / Compliance / RWA → [The demonstration](#the-demonstration).
 Confidential-token and private-payment wallets → [The wallet](#the-wallet).
 
+## For judges
+
+The submission form held a repository and a video. Everything else it could not hold is one click from here:
+
+| | |
+|---|---|
+| **Demo video**, and the argument it makes | [`docs/video/sigilo-demo.mp4`](docs/video/sigilo-demo.mp4) · [captions](docs/video/captions.md) |
+| **Run it yourself**, every click listed | [docs/DEMO.md](docs/DEMO.md) |
+| **Architecture**, with the full reference run | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — every hash public |
+| **The contract that is ours**, live on testnet | [`contracts/policy-bridge`](contracts/policy-bridge) · [`CD63ZKLY…`](https://stellar.expert/explorer/testnet/contract/CD63ZKLYQ2I3O3EJRAHIMPZQO424VGZHOG7INSY7IY3BYJZI2D6RHXRU) |
+| **The two transactions carrying the whole argument** | [revoked holder withdraws anyway](https://stellar.expert/explorer/testnet/tx/c2f2264ad3d599dac9f7205c3c987568794d83785a7085dcce39de871805aeeb) · [again, re-credentialed](https://stellar.expert/explorer/testnet/tx/9cdd9675894941338fe0e5d053f4304f92622d0c10aa021e1877bc17c9733436) |
+| **The wallet**, the same rail from the holder's end | [`app/wallet.html`](app/wallet.html) · [its run, with hashes](#the-wallets-own-run-with-hashes) · [its guarantees](docs/ARCHITECTURE.md#the-holders-wallet) |
+| **Verify without trusting us** | [three commands](#verify-this-yourself) — no deployment, no keys, no us |
+
 We revoked a holder's KYC credential and they withdrew from the privacy pool anyway: [`c2f2264a`](https://stellar.expert/explorer/testnet/tx/c2f2264ad3d599dac9f7205c3c987568794d83785a7085dcce39de871805aeeb), a real testnet transaction, published rather than deleted. That is the gap. A permissioned token and a confidential rail each enforce their own policy correctly and neither knows about the other, so revoking a credential does nothing to money already inside the pool.
 
 Everyone else proves you are on the list. Sigilo proves you are *not* — and does it where the money already is.
