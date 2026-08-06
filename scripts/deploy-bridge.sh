@@ -33,6 +33,38 @@ VERIFIER=$(jq -r '.identity.verifier' "$STATE/rwa.json")
 ALLOWLIST=$(jq -r '.asp_membership' "$STATE/rail.json")
 BLOCKLIST=$(jq -r '.asp_non_membership' "$STATE/rail.json")
 
+# Who administers a tree, read from the chain.
+#
+# The trees expose no `admin()` getter, so this reads `DataKey::Admin` out of
+# persistent storage directly. A unit variant of a `#[contracttype]` enum encodes
+# as a one-element vec rather than a bare symbol, which is why the key is built
+# with `xdr encode` instead of passed to `--key`.
+ADMIN_KEY=$(printf '{"vec":[{"symbol":"Admin"}]}' | stellar xdr encode --type ScVal --output single-base64)
+
+# The trailing `|| true` is load-bearing: under `pipefail` a grep that matches
+# nothing fails the pipeline, and the caller's `current=$(tree_admin …)` would
+# then abort the script through `set -e` before it could say why.
+tree_admin() {  # tree_admin <tree_id> → C… , or empty if unreadable
+  stellar contract read "${NET[@]}" --id "$1" --durability persistent \
+    --key-xdr "$ADMIN_KEY" 2>/dev/null | grep -oE 'C[A-Z0-9]{55}' | head -1 || true
+}
+
+# Checked before anything is deployed, because handing the trees over is the only
+# step that cannot be retried. Once a bridge owns them nothing can take them back:
+# the contract has no `update_admin` passthrough, and that missing door is exactly
+# what makes the gate non-circumventable. The price is that replacing the bridge
+# means replacing the trees.
+step "checking the association sets can still be handed over"
+for tree in "$ALLOWLIST" "$BLOCKLIST"; do
+  current=$(tree_admin "$tree")
+  printf '  %s… admin %s\n' "${tree:0:12}" "${current:-unreadable}"
+  [[ -n "$current" ]] || die "cannot read the admin of $tree — refusing to deploy blind"
+  [[ "$current" == "$OPERATOR" ]] || die "$tree is administered by $current, not the operator.
+  A previous bridge already owns it and cannot give it back. Deploy new association
+  sets and re-run this script against them; deploying another bridge now would
+  produce one that administers nothing."
+done
+
 step "building the contract"
 ( cd "$ROOT/contracts/policy-bridge" && stellar contract build --out-dir "$STATE/wasm" >/dev/null 2>&1 )
 WASM="$STATE/wasm/policy_bridge.wasm"
@@ -54,20 +86,30 @@ for tree in "$ALLOWLIST" "$BLOCKLIST"; do
        -- update_admin --new_admin "$BRIDGE" >/dev/null 2>&1; then
     echo "done"
   else
-    echo "failed — the operator may already have handed it over"
+    # Fatal, and it did not used to be. This printed "the operator may already
+    # have handed it over" and carried on, which left rwa.json pointing at a
+    # bridge that administers nothing and every grant trapping on insert_leaf.
+    echo "FAILED"
+    die "could not hand $tree to $BRIDGE. That bridge is now deployed but powerless;
+  do not record it. The trees still answer to their previous admin."
   fi
 done
 
+step "verifying the handover"
+for tree in "$ALLOWLIST" "$BLOCKLIST"; do
+  current=$(tree_admin "$tree")
+  printf '  %s… admin %s\n' "${tree:0:12}" "${current:-unreadable}"
+  [[ "$current" == "$BRIDGE" ]] || die "$tree names $current as admin, not the bridge just deployed."
+done
+# Asserting *who* the admin is, rather than that the operator is refused. The old
+# check invoked insert_leaf as the operator and read a refusal as proof — but a
+# refusal is equally consistent with some earlier bridge owning the trees, so it
+# passed in exactly the case it existed to catch. It also wrote a junk leaf into
+# the allowlist whenever the handover had in fact failed.
+echo "  the operator cannot reach the trees; only this bridge can"
+
 tmp=$(mktemp)
 jq --arg b "$BRIDGE" '.policyBridge = $b' "$STATE/rwa.json" > "$tmp" && mv "$tmp" "$STATE/rwa.json"
-
-step "checking the operator is locked out"
-if stellar contract invoke "${NET[@]}" --id "$ALLOWLIST" --source sigilo-admin \
-     -- insert_leaf --leaf 1 >/dev/null 2>&1; then
-  echo "  ⚠ the operator can still write to the allowlist directly — the handover did not take"
-else
-  echo "  the operator cannot reach the trees; only the contract can"
-fi
 
 echo
 echo "PolicyBridge: $BRIDGE"
