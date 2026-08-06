@@ -26,6 +26,10 @@ const el = (id) => document.getElementById(id);
 let demo;
 let current = null;      // { holder, account, pool, notes }
 let selectedNote = null;
+// Bumped on every switch, so a superseded open can be told from the current one.
+let openGeneration = 0;
+// The holder actually open, as opposed to the one the selector names mid-switch.
+let openHolder = null;
 
 function setProgress(id, text, stage) {
   el(id).innerHTML = stage ? `<span class="stage">${stage}</span> ${text}` : (text ?? '');
@@ -410,7 +414,15 @@ function lockActions(locked) {
 }
 
 async function openWallet(name) {
+  // Only the newest switch may publish its result. Opening takes seconds, so two
+  // selections overlap easily — and without this the slower one lands last and
+  // installs its account behind a selector naming the faster one, which means the
+  // next Send signs from a wallet the page is not showing.
+  const generation = ++openGeneration;
+  const superseded = () => generation !== openGeneration;
+
   const holder = demo.holders.find((h) => h.name === name);
+  el('wallet-pick').value = name;   // the selector names what is opening, from the first statement
   current = null;
   selectedNote = null;
 
@@ -424,7 +436,9 @@ async function openWallet(name) {
   const signer = new LocalSigner(holder.secret, NETWORK_PASSPHRASE);
   const account = await openAccount(holder.address, signer, NETWORK_PASSPHRASE);
   const pool = await openPool(account, demo.rail.pool);
+  if (superseded()) return;
   current = { holder, account, pool, notes: [] };
+  openHolder = name;
 
   // Recipients are the rest of the cast; a free-text address still overrides it.
   el('send-to').innerHTML = demo.holders
@@ -433,6 +447,7 @@ async function openWallet(name) {
     .join('');
 
   await Promise.all([refresh(), renderReceiveKeys(holder.address)]);
+  if (superseded()) return;   // a newer switch owns the buttons and the progress line
   // renderNoteChoices, inside refresh(), owns btn-disclose from here on.
   lockActions(false);
   el('btn-derive').disabled = !holder.enrolledLeaf;
@@ -455,8 +470,12 @@ async function start() {
       .join('');
 
     el('wallet-pick').addEventListener('change', (e) => {
-      openWallet(e.target.value).catch((error) =>
-        setProgress('wallet-progress', `failed: ${error?.message ?? error}`));
+      openWallet(e.target.value).catch((error) => {
+        setProgress('wallet-progress', `failed: ${error?.message ?? error}`);
+        // Put the selector back on the wallet that is actually open. Leaving it on
+        // the one that failed would have the page name a holder it never loaded.
+        if (openHolder) el('wallet-pick').value = openHolder;
+      });
     });
 
     el('btn-send').addEventListener('click', send);
