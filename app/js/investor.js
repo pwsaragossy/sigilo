@@ -74,6 +74,12 @@ function renderPrivate(notes) {
     </p>`;
 }
 
+// The CLI records the leaf in decimal, the SDK answers in hex. Comparing as
+// numbers is correct — but showing them in different bases would put two
+// unlike strings under a "matches" badge, which reads as a contradiction.
+const asBigInt = (v) => BigInt(/^0x/i.test(String(v)) ? String(v) : String(v).trim());
+const asHex = (v) => `0x${asBigInt(v).toString(16).padStart(64, '0')}`;
+
 /**
  * What the policy operator was given, and what this holder can check.
  *
@@ -95,7 +101,7 @@ function renderEnrolment(holder) {
 
     <dt>Leaf on record</dt>
     <dd class="mono-sm">${holder.enrolledLeaf
-      ? short(holder.enrolledLeaf, 14, 10)
+      ? short(asHex(holder.enrolledLeaf), 14, 10)
       : 'not enrolled yet'}<div class="hint">what the policy gate inserted under this name</div></dd>
   `;
 }
@@ -111,14 +117,12 @@ async function deriveLeaf() {
   try {
     // The account owns the secret; the page only ever sees the resulting leaf.
     const derived = await current.account.deriveAspUserLeaf();
-    // The CLI records a decimal, the SDK may answer in hex — compare as numbers.
-    const asBig = (v) => BigInt(/^0x/i.test(String(v)) ? String(v) : String(v).trim());
-    const match = asBig(derived) === asBig(holder.enrolledLeaf);
+    const match = asBigInt(derived) === asBigInt(holder.enrolledLeaf);
 
     el('derive-out').innerHTML = `
       <dl class="fields">
         <dt>Derived here</dt>
-        <dd class="mono-sm ${match ? 'revealed' : ''}">${short(String(derived), 14, 10)}</dd>
+        <dd class="mono-sm ${match ? 'revealed' : ''}">${short(asHex(derived), 14, 10)}</dd>
         <dt>Verdict</dt>
         <dd>${match
           ? '<span class="badge ok">matches the leaf on record</span>'

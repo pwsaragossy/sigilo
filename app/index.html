@@ -40,18 +40,25 @@
 </header>
 
 <!--
-  One coupon's journey, and which system governs each leg of it. The steps light up
-  as they happen, so it is always visible where in the cycle you are — and, more to
-  the point, that two different systems are being asked two different questions.
+  One coupon's journey. Each step names who acts and what moves, so the row reads
+  as an argument rather than a checklist — the system answering at each leg is left
+  to the sentence below, which has room to say it in words.
 -->
 <nav class="flow" aria-label="Lifecycle">
   <ol>
-    <li data-step="credential"><span class="n">1</span><span class="what">Credential issued</span><span class="who">identity register</span></li>
-    <li data-step="policy"><span class="n">2</span><span class="what">Policy synced</span><span class="who">on-chain policy gate</span></li>
-    <li data-step="pay"><span class="n">3</span><span class="what">Coupon paid</span><span class="who">confidential payment</span></li>
-    <li data-step="receive"><span class="n">4</span><span class="what">Holder decrypts</span><span class="who">holder's key</span></li>
-    <li data-step="prove"><span class="n">5</span><span class="what">Auditor verifies</span><span class="who">zero-knowledge proof</span></li>
+    <li data-step="credential"><span class="n">1</span><span class="what">Issuer grants the credential</span></li>
+    <li data-step="policy"><span class="n">2</span><span class="what">Policy gate syncs</span></li>
+    <li data-step="pay"><span class="n">3</span><span class="what">Holder is paid, privately</span></li>
+    <li data-step="receive"><span class="n">4</span><span class="what">Holder decrypts</span></li>
+    <li data-step="prove"><span class="n">5</span><span class="what">Auditor verifies without seeing</span></li>
   </ol>
+  <!--
+    The bar says where the cycle is; this says what that means. Driven by the
+    same flow.js calls the steps already use, so it narrates real state rather
+    than a script — and when the two systems disagree it carries the argument
+    this whole project is about.
+  -->
+  <p id="flow-say" aria-live="polite"></p>
 </nav>
 
 <main>

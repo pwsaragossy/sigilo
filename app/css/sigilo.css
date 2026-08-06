@@ -136,13 +136,6 @@ header {
   letter-spacing: 0.02em;
 }
 
-.flow .who {
-  font-size: 10px;
-  color: var(--vellum-faint);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
 .flow li[data-done] { opacity: 0.72; }
 .flow li[data-done] .n { color: var(--verified); }
 
@@ -151,19 +144,34 @@ header {
   border-left-color: var(--seal);
 }
 .flow li[data-active] .n { color: var(--seal); }
-.flow li[data-active] .who { color: var(--seal-dim); }
 
 /* The bridge is step 2, and it is the one that can be out of step with itself. */
 .flow li[data-step='policy'][data-broken] {
   opacity: 1;
   border-left-color: var(--refused);
 }
-.flow li[data-step='policy'][data-broken] .n,
-.flow li[data-step='policy'][data-broken] .who { color: var(--refused); }
+.flow li[data-step='policy'][data-broken] .n { color: var(--refused); }
+
+/* The sentence under the row. min-height is load-bearing: without it the page
+   jumps every time the line changes length, which turns narration into flicker. */
+#flow-say {
+  max-width: 1180px;
+  margin: 11px auto 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--ink-line);
+  color: var(--vellum-dim);
+  font-size: 12.5px;
+  line-height: 1.5;
+  min-height: 2.4em;
+  transition: color 0.3s;
+}
+
+#flow-say[data-broken] { color: var(--refused); }
 
 @media (max-width: 900px) {
   .flow ol { flex-wrap: wrap; }
   .flow li { flex: 1 1 45%; }
+  #flow-say { min-height: 3.6em; }
 }
 
 /* ---------- layout ---------- */
