@@ -38,10 +38,58 @@ const STORAGE_LOCK = 'sigilo:spp-storage';
 // short enough that a real collision is named before anyone starts waiting.
 const LOCK_GRACE_MS = 1500;
 
+// Set on the way out, honoured on the way back in. The pool cannot be deleted
+// while the storage worker holds it open, so a page that has already opened
+// storage cannot clear its own — it has to ask the next load to do it.
+const RESET_FLAG = 'sigilo:reset-local-db';
+
 let wasmReady = false;
 let storageHandle = null;
 let clientHandle = null;
 const accounts = new Map(); // address → Account
+
+/**
+ * Throws away this browser's copy of the wallet and reloads.
+ *
+ * Every `sync` moves the association roots, and note state cached against the
+ * previous ones produces a proof the pool rejects — a failure that reads like a
+ * bug rather than the stale cache it is. Clearing it took DevTools until now,
+ * which is a poor thing to need in the middle of a take.
+ *
+ * On-chain history is untouched: note state is rebuilt from the chain on the
+ * next load, so earlier payments come back, marked spent.
+ */
+export function resetLocalDatabase() {
+  try {
+    sessionStorage.setItem(RESET_FLAG, '1');
+  } catch {
+    // Private mode, or storage disabled — the reload alone still helps.
+  }
+  location.reload();
+}
+
+/** Deletes the OPFS pool if the previous page asked for it. Must run before
+ *  `Storage.open()`, while nothing holds the pool. */
+async function clearLocalDatabaseIfRequested() {
+  let asked = false;
+  try {
+    asked = sessionStorage.getItem(RESET_FLAG) === '1';
+    if (asked) sessionStorage.removeItem(RESET_FLAG);
+  } catch { /* storage unavailable; nothing was asked */ }
+  if (!asked || !navigator.storage?.getDirectory) return;
+
+  try {
+    const root = await navigator.storage.getDirectory();
+    const names = [];
+    for await (const [name] of root.entries()) names.push(name);
+    for (const name of names) {
+      await root.removeEntry(name, { recursive: true }).catch(() => {});
+    }
+  } catch {
+    // A cache that will not clear is worth reporting, but not worth blocking
+    // the page over — the wallet still opens, just against what was there.
+  }
+}
 
 async function ensureWasm() {
   if (!wasmReady) {
@@ -87,6 +135,7 @@ function claimStorageLock() {
 export async function ensureStorage() {
   await ensureWasm();
   if (!storageHandle) {
+    await clearLocalDatabaseIfRequested();
     if (!(await claimStorageLock())) {
       throw new Error(
         "Another tab or window is using this app's local database. "

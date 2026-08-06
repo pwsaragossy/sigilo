@@ -16,7 +16,7 @@ import {
 } from './demo-state.js';
 import {
   initRuntime, openAccount, pool as openPool, resolveRecipient,
-  onProgress, describeResult, isDbLocked,
+  onProgress, describeResult, isDbLocked, resetLocalDatabase,
 } from './sdk-facade.js';
 import { LocalSigner } from './local-signer.js';
 import { mountAuditor } from './auditor.js';
@@ -456,6 +456,10 @@ async function openWallet(name) {
 }
 
 async function start() {
+  // Wired before anything that can throw, and never disabled by lockActions: the
+  // reason to reach for it is usually that the wallet did not come up.
+  el('btn-reset-cache').addEventListener('click', resetLocalDatabase);
+
   // The runtime takes seconds to come up on a cold start; nothing is clickable
   // until there is a wallet behind it.
   lockActions(true);

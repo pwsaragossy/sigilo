@@ -1,7 +1,7 @@
 // Page bootstrap and role switching.
 
 import { loadDemoState, RPC_URL } from './demo-state.js';
-import { initRuntime, isDbLocked } from './sdk-facade.js';
+import { initRuntime, isDbLocked, resetLocalDatabase } from './sdk-facade.js';
 import { mountIssuer } from './issuer.js';
 import { mountInvestor } from './investor.js';
 import { mountAuditor } from './auditor.js';
@@ -31,6 +31,11 @@ function wireTabs() {
 }
 
 async function start() {
+  // Wired first and never disabled: the reason to reach for it is usually that
+  // the page did not come up.
+  document.getElementById('btn-reset-cache')
+    .addEventListener('click', resetLocalDatabase);
+
   wireTabs();
   // The bar opens with a "you are here", not five dim words: the cycle starts
   // where every holder's story starts, at the credential.

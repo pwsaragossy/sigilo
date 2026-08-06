@@ -204,11 +204,18 @@
     <div id="verify-out" style="margin-top:14px"></div>
   </section>
 
-  <p class="hint" style="margin:26px 0 40px">
+  <p class="hint" style="margin:26px 0 12px">
     One wallet page, one exclusive local database — close the
     <a href="index.html">issuer / investor / auditor demo</a> before opening this, or the
     second tab evicts the first. Proving is real work: ~9–13 s of Groth16 per operation,
     in a worker, not simulated.
+  </p>
+
+  <p class="hint" style="margin:0 0 40px">
+    <button class="ghost" id="btn-reset-cache">Reset demo cache</button>
+    After a policy sync the association roots move, and note state cached against the
+    previous ones is refused by the pool. This throws that copy away and reloads.
+    On-chain history is rebuilt from the chain — earlier payments come back, marked spent.
   </p>
 
 </main>
