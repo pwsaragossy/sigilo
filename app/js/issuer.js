@@ -76,7 +76,9 @@ function renderHolders() {
       <td class="num">${fmt(h.position, 0)}</td>
       <td>${h.entryDate}</td>
       <td data-credential>${credentialBadge(h)}</td>
-      <td class="link-cell" ${outOfStep(h) ? 'data-broken' : ''}>${outOfStep(h) ? '╳' : '───'}</td>
+      <td class="link-cell"><span class="arrow" ${outOfStep(h) ? 'data-broken' : ''}>${
+        outOfStep(h) ? '<span class="x">\u2573</span>' : ''}</span>${
+        outOfStep(h) ? '<span class="gap-tag">gap</span>' : ''}</td>
       <td data-spend>${h.railBlocked
         ? '<span class="badge bad">frozen</span>'
         : (h.allowlisted ? '<span class="badge ok">allowed</span>' : '<span class="badge public">pending</span>')}
@@ -113,8 +115,6 @@ function renderBridge() {
        <em>the contract has no private key</em>.`
     : `Kept in step by an off-chain service. Nothing on-chain compels it to mirror the
        registry faithfully — deploy the PolicyBridge contract to remove that trust.`;
-
-  el('bridge-link').toggleAttribute('data-broken', broken.length > 0);
 
   // "Out of step" is the thesis, so it does not get to be a whisper. The banner
   // names who, what was never told, and what is at stake — in the direction the

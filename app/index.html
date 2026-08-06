@@ -93,21 +93,40 @@
             <th scope="colgroup">
               Identity register
               <div class="side-sub">who may hold the asset</div>
+              <div class="side-sub attrib">OpenZeppelin ERC-3643</div>
             </th>
-            <th><div class="link" id="bridge-link" aria-hidden="true"></div></th>
+            <!-- No title here: "The bridge" is a column, not a group over columns,
+                 so it is named in the label row beside Credential and Spend. What
+                 belongs at this level is the rule itself, drawn at the same height
+                 as the two systems it joins. -->
+            <th class="bridge-head">
+              <div class="rule-slot"><span class="arrow" id="bridge-link" aria-hidden="true"></span></div>
+              <div class="side-sub attrib ours">ours</div>
+            </th>
             <th scope="colgroup">
               Confidential payments
               <div class="side-sub">who may move money inside them</div>
+              <div class="side-sub attrib">Nethermind privacy pool</div>
             </th>
             <td></td>
           </tr>
           <tr>
             <th>Holder</th><th class="num">Position</th><th>Entry</th>
-            <th>Credential</th><th></th><th>Spend</th><th></th>
+            <th>Credential</th><th class="bridge-col">The bridge</th><th>Spend</th><th></th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
+
+      <!-- A key for the middle column, drawn with the same elements the rows use,
+           so it cannot drift from what the table actually renders. -->
+      <dl class="bridge-key">
+        <dt><span class="arrow key-arrow"></span></dt>
+        <dd><b>in sync</b> — the register's verdict has reached the pool</dd>
+        <dt><span class="arrow key-arrow" data-broken><span class="x">╳</span></span></dt>
+        <dd><b>gap</b> — revoked in the register, still spendable in the pool.
+            <em>Sync policy</em> closes it; until then the money moves.</dd>
+      </dl>
 
       <div style="margin-top:18px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
         <button class="action" id="btn-sync">Sync policy</button>

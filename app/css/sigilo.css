@@ -11,6 +11,7 @@
 
   --seal: #c8963e;         /* wax seal — the disclosed, the attested */
   --seal-dim: #8a6a2c;
+  --seal-bright: #edb457;  /* the bridge — the one piece that is ours */
   --verified: #4fb286;     /* proven */
   --refused: #d1584f;      /* refused, frozen */
   --redacted: #2a2f3a;     /* the bar over what stays hidden */
@@ -245,40 +246,101 @@ tr.systems td { border-bottom: 0; padding: 0; }
   letter-spacing: 0.03em;
 }
 
-.link {
+/* One arrow, drawn once, used by the header and every row. A crisp rule with a
+   real head — not a text glyph, which never matched weight with the rest of the
+   column and could not be scaled without shifting the baseline.
+
+   The header's arrow is always gold. It names the mechanism, and the mechanism is
+   ours whatever the rows happen to say; state belongs to the rows. Making the
+   header go red on any holder's gap conflated the two. */
+.arrow {
+  position: relative;
+  display: block;
   width: 100%;
   min-width: 44px;
   height: 2px;
-  background: var(--verified);
-  position: relative;
-  transition: background 0.35s;
+  background: var(--seal-bright);
 }
-.link::after {
-  content: 'in sync';
+.arrow::after {
+  content: '';
   position: absolute;
-  top: 8px; left: 50%;
-  transform: translateX(-50%);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--verified);
-  white-space: nowrap;
+  right: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left: 8px solid var(--seal-bright);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
 }
 
-.link[data-broken] {
+/* The break: the line goes dashed and red, and a mark sits in a gap punched
+   through the middle of it. The arrow still points — it set off and did not
+   arrive, which is exactly what an open gap is. */
+.arrow[data-broken] {
   background: repeating-linear-gradient(
     90deg, var(--refused) 0 6px, transparent 6px 12px);
 }
-.link[data-broken]::after { content: 'out of step'; color: var(--refused); }
+.arrow[data-broken]::after { border-left-color: var(--refused); }
+.arrow .x {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--refused);
+  background: var(--ink-raised);
+  padding: 0 4px;
+}
 
-/* Per-holder link, echoing the header at row level. */
-td.link-cell { text-align: center; color: var(--verified); letter-spacing: 0.1em; }
-td.link-cell[data-broken] { color: var(--refused); }
+/* The column header names the mechanism; the cells carry the verdict. It used to
+   be the other way round, so a header reading "in sync" sat above a row that had
+   already broken.
+
+   All three headers align to the top and share the same three-line rhythm —
+   title, sub, attribution — so the row reads as one sentence. */
+tr.systems th { vertical-align: top; }
+.bridge-head { text-align: center; color: var(--seal-bright); }
+/* Matches a title line's height, so the rule is drawn level with the two systems
+   it joins rather than below them. */
+.bridge-head .rule-slot { display: flex; align-items: center; height: 20px; }
+.attrib { font-size: 10px; letter-spacing: 0.05em; color: var(--vellum-faint); }
+.attrib.ours { color: var(--seal-bright); }
+
+/* A peer of CREDENTIAL and SPEND, gold so the eye reads three columns and knows
+   which one is ours. */
+th.bridge-col { text-align: center; color: var(--seal-bright); }
+
+td.link-cell { padding-left: 4px; padding-right: 10px; min-width: 76px; }
+td.link-cell .gap-tag {
+  display: block;
+  font-size: 10px;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--refused);
+  text-align: center;
+  margin-top: 9px;
+}
 
 .out-of-step { color: var(--seal); margin-top: 5px; }
 
-/* ---------- tables ---------- */
+/* Key for the bridge column, drawn with the same .arrow the table uses so it
+   cannot drift from what the rows render. */
+.bridge-key {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 10px 14px;
+  align-items: center;
+  margin: 18px 0 0;
+  font-size: 12px;
+  color: var(--vellum-dim);
+}
+.bridge-key dt { display: flex; align-items: center; }
+.bridge-key dd { margin: 0; }
+.bridge-key b { color: var(--vellum); font-weight: 400; }
+.bridge-key .arrow { width: 74px; min-width: 74px; }
+.bridge-key .arrow .x { font-size: 15px; }
 
+/* ---------- tables ---------- */
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th {
   text-align: left;
