@@ -104,6 +104,36 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 3b. Consolidate — a balance is not the same as a spendable balance
+#
+# The transfer circuit takes two input notes. A treasury holding 700 XLM across
+# seven 100 XLM notes cannot pay inv4's 287.25625 coupon: the two largest notes
+# it may spend reach 200, and the cycle dies on "no combination of notes reaches
+# the goal amount". Deposits cap at 100 XLM, so funding alone never fixes it.
+#
+# Sweeping fragments the float every run — one note back from each holder — so
+# this belongs after the sweep, not once at setup. Each self-transfer merges two
+# notes into one, which is why it is a loop and not a single call: the bound is
+# the number of holders plus the treasury's own change note.
+# ---------------------------------------------------------------------------
+if (( ! KEEP_NOTES )); then
+  step "consolidating the treasury's notes"
+  balance=$(pool_balance "$STATE/rail-treasury" sigilo-treasury)
+  if [[ -z "$balance" || "$balance" == "0" ]]; then
+    echo "  nothing to consolidate"
+  else
+    merges=$(( $(jq -r '.holders | length' "$STATE/rwa.json") + 1 ))
+    printf '  %s XLM, up to %d merges… ' "$balance" "$merges"
+    for _ in $(seq 1 "$merges"); do
+      spp "$STATE/rail-treasury" sigilo-treasury \
+        transfer "$POOL" "$balance" --to "$TREASURY" >/dev/null 2>&1 || break
+    done
+    echo "done"
+    echo "  (one note now, so the largest coupon is payable from it alone)"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # 4. Report — the treasury must be able to fund the next cycle
 # ---------------------------------------------------------------------------
 step "state"
@@ -111,7 +141,8 @@ ensure_onboarded "$STATE/rail-treasury" sigilo-treasury
 treasury_balance=$(pool_balance "$STATE/rail-treasury" sigilo-treasury)
 echo "  treasury in pool: ${treasury_balance:-unknown} XLM"
 echo "  (the issuer view lists what the next cycle owes; top up with"
-echo "   'spp deposit' if the treasury falls short — 100 XLM per deposit)"
+echo "   'spp deposit' if the treasury falls short — 100 XLM per deposit,"
+echo "   then re-run this script so the new notes are merged into one)"
 
 cat <<'NEXT'
 

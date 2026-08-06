@@ -136,7 +136,8 @@ This is the part that makes confidentiality acceptable rather than suspicious. H
 | *"failed to load prover: operation timed out"*, on the first load | Cold start: storage rebuilds note state from the chain while the prover compiles 21 MB of wasm, and together they exceed the SDK's 30s budget | **Reload.** The second load finds both warm and starts clean |
 | *"Another tab has this demo open"* | The confidential payment SDK keeps one exclusive local database | Close the other tab, reload |
 | The investor shows coupons from earlier runs | Note state is rebuilt from the chain, so `reset.sh` spends those coupons rather than erasing them — clearing site data brings them straight back | Expected, and they read `spent`. A genuinely empty history needs a fresh deployment |
-| A payment fails midway | Usually the treasury ran out of pool funding | Check the balance the reset prints; top up with `spp deposit` (100 XLM per deposit) |
+| *"no combination of notes reaches the goal amount"* | The transfer circuit spends **two** input notes. A treasury holding 700 XLM as seven 100 XLM notes still cannot pay a 287 XLM coupon — the two largest it may spend reach 200. Deposits cap at 100 XLM, so funding alone never fixes it | Re-run `reset.sh`: it merges the float into one note after sweeping. If it is genuinely short, `spp deposit` first, then reset |
+| A payment fails midway | Usually the treasury ran out of pool funding | Check the balance the reset prints; top up with `spp deposit` (100 XLM per deposit), then re-run `reset.sh` to merge the new notes |
 | *"Not yet enrolled in the allow-list"* | The holder was never synced | Click **Sync policy** |
 | Nothing happens for 15 seconds | Normal — a proof is being computed | Wait. The progress line names the stage |
 
