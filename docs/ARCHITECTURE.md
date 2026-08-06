@@ -40,7 +40,8 @@ The retroactive freeze is the interesting property for an institutional reader: 
 > they simply narrate the earlier deployment. The current bridge is
 > [`CDMAWFOV…`](https://stellar.expert/explorer/testnet/contract/CDMAWFOVVDFTBVK6D5DFL4K5BKYYZKYRXU5EOEHLR4KS5BDD6OPSVL6J),
 > and the pool was re-pointed at the new trees rather than redeployed, so balances
-> and note keys carried across untouched.
+> and note keys carried across. Spending against the new trees is currently broken;
+> see [Known defect in the current deployment](#known-defect-in-the-current-deployment).
 
 Both directions are gated, which is what makes it more than automation:
 
@@ -308,7 +309,7 @@ The confidentiality check runs on **decoded** XDR. Encoded integers are binary, 
 
 Deposit and withdrawal are the positive control — value crossing the pool boundary is public by construction, and the identical method finds it both times. The transfer's zero is therefore a measurement rather than a failed search. That transaction carries `new_commitment` ×4, `new_nullifier` ×4 and `encrypted_output` ×6, and exposes no `amount` field in its envelope; `inv5` reads it as `3.00` locally from the note ciphertext.
 
-### The freeze, driven through the fixed bridge
+### The revocation, driven through the fixed bridge
 
 Run after the redeploy, as `inv2`, against `CDMAWFOV…`:
 
@@ -316,17 +317,47 @@ Run after the redeploy, as `inv2`, against `CDMAWFOV…`:
 |---|---|---|
 | Revoke `inv2`'s KYC claim in the register | `ClaimRemoved` | [`e0c3aa4…`](https://stellar.expert/explorer/testnet/tx/e0c3aa4b7389c01679d0f97e468fb48acdea0ae366d8ab9cf8fd37efaff65d76) |
 | `sync` → bridge `revoke(holder)`, **no key argument** | `credential absent → blocklisted` | [`ea3c999…`](https://stellar.expert/explorer/testnet/tx/ea3c999b50377af6f5f6325a58da2469c7ad2035c46e23dfb205d5896ad2921f) |
-| Wallet withdrawal of 2 XLM | **refused** — `Error(Contract, #7)` from the pool | — |
 | Restore the claim, `sync` back | `credential restored → unfrozen` | [`bb5fed4…`](https://stellar.expert/explorer/testnet/tx/bb5fed4c10e7003ec890e71339ada5971ecf8526a85cc60900c5686a0f49de21) |
 
 The middle row is the one the old deployment could not produce: `revoke` takes no key, so the bridge had to read `Enrolment(inv2)` to know what to freeze. Decoding the `PolicyChanged` event it emitted, against the enrolment itself:
 
 ```
-event  → { leaf: 536237045…839636, note_key: 1399718337…760248 }
+event           → { leaf: 536237045…839636, note_key: 1399718337…760248 }
 enrolment(inv2) → { leaf: 536237045…839636, note_key: 1399718337…760248 }
 ```
 
 Identical. The key frozen is provably the key the register approved, and an auditor reads that off the chain rather than taking it on trust — which the old event, carrying no key at all, made impossible.
+
+> **Retracted, and why.** An earlier version of this table carried a fourth row:
+> a wallet withdrawal "refused — `Error(Contract, #7)`", presented as the freeze
+> being felt by the holder. That reading was wrong. Pool error #7 is
+> `InvalidProof`, not a policy refusal, and the same error appears for holders
+> who were never revoked. It is a real defect in the redeployed rail, described
+> below — not evidence of the gate working. The row is withdrawn rather than
+> quietly deleted, because a project that publishes its negative results does not
+> get to make an exception when the negative result is its own overclaim.
+
+### Known defect in the current deployment
+
+Since the trees were replaced, **no holder can spend against them**. Every
+transfer and withdrawal fails simulation with `Error(Contract, #7)`
+`InvalidProof` from the pool, for revoked and unrevoked holders alike.
+
+What is ruled out: the pool reads the new trees correctly and their roots match
+`get_root` on both contracts, so the root-equality checks at
+`pool.rs:588-598` are not what fails; and a full OPFS wipe does not change it,
+so it is not stale client state. The leaves are present in the new allowlist —
+the holders were re-granted with the same leaves and note keys they already had.
+What remains is the association-membership proof itself: these rail identities
+were established against the previous trees.
+
+The wallet's own run above was recorded **before** the tree replacement and
+those transactions are unaffected. The coupon-cycle hashes predate it too.
+
+Two candidate remedies, neither yet verified: re-point the pool at the previous
+trees, which are known-good and still administered by the superseded bridge; or
+re-onboard the rail identities against the new trees, which mints new note keys
+and abandons the current pool balances, the treasury's included.
 
 Proving takes roughly 9 s of CPU per operation. The revocation block surfaces client-side, when the wallet assembles its proof context — the association-set check fails before a transaction is ever built.
 

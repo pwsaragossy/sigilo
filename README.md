@@ -46,7 +46,7 @@ The bolded row is the one to open: a successful withdrawal by a holder already r
 
 ### The wallet's own run, with hashes
 
-Driven through [`app/wallet.html`](app/wallet.html) as `inv2`, private balance read before and after each step.
+Through [`app/wallet.html`](app/wallet.html) as `inv2`, private balance read before and after each step.
 
 | Step | `#bal-private` | Transaction |
 |---|---|---|
@@ -64,11 +64,11 @@ A confidential balance is only worth holding if you can prove one line of it. Hi
 
 **[`app/wallet.html`](app/wallet.html)** is the holder's side as its own page: the balance decrypted locally, a private send, a deposit, a withdrawal the policy gate can refuse, the payment history, the enrolment check — and a receipt for one payment, verified on the same page by a panel with no keys, no storage and no account.
 
-**Nothing on the page is readable off it.** Amounts come out of note ciphertexts with the holder's own key; an observer sees `invoke_host_function` and two addresses. **Disclosure is theirs to give** — the circuit requires the note's spending key, so not even the issuer can produce a receipt on their behalf, and each field is marked *proven* or *attested*. **The enrolment is checkable by the person it was done to:** the wallet re-derives the allow-list leaf from the holder's own key and compares. Each in full: [ARCHITECTURE.md](docs/ARCHITECTURE.md#the-holders-wallet).
+**Nothing on the page is readable off it.** Amounts come out of note ciphertexts with the holder's key; an observer sees `invoke_host_function` and two addresses. **Disclosure is theirs to give** — the circuit requires the note's spending key, so not even the issuer can produce a receipt on their behalf, and each field is marked *proven* or *attested*. **The enrolment is checkable by the person it was done to:** the wallet re-derives the allow-list leaf from the holder's own key and compares. Each in full: [ARCHITECTURE.md](docs/ARCHITECTURE.md#the-holders-wallet).
 
-**The withdrawal is where the policy gate is felt.** Revoking `inv2` left the balance readable and unspendable — **refused**, `Error(Contract, #7)`, over coupons already held. The bridge call that froze it takes no key: it read the `Enrolment`, and the event names that same `note_key`. [The run, with hashes](docs/ARCHITECTURE.md#the-freeze-driven-through-the-fixed-bridge).
+**The withdrawal is where the policy gate is felt** — a blocklisted holder is refused over coupons already held. Revoking `inv2` through the fixed bridge is [recorded on-chain](docs/ARCHITECTURE.md#the-revocation-driven-through-the-fixed-bridge), and the event names the same `note_key` the enrolment holds. The wallet-side refusal is **not** currently demonstrable: since the trees were replaced no holder can spend, a [declared defect](docs/ARCHITECTURE.md#known-defect-in-the-current-deployment).
 
-**What the wallet is not.** It opens the five seeded holders from throwaway keys, not an account you own; a real one holds a single key and asks a browser extension for it. Proving is real work — roughly 9–13 s of Groth16 per operation, in a worker, and the page says so rather than looking hung.
+**What the wallet is not.** It opens five seeded holders from throwaway keys, not an account you own; a real one holds a single key and asks a browser extension for it. Proving is real work — roughly 9–13 s of Groth16 per operation, in a worker, and the page says so rather than looking hung.
 
 ## Verify this yourself
 
