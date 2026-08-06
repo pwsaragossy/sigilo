@@ -13,7 +13,7 @@ Everyone else proves you are on the list. Sigilo proves you are *not* — and do
 
 Sigilo binds OpenZeppelin's ERC-3643 permissioned token to Nethermind's confidential payment pool through an original Soroban contract — [`contracts/policy-bridge`](contracts/policy-bridge), 368 lines of contract and 526 of tests. [Attribution and pinned commits](#what-is-ours-and-what-is-not). Testnet only.
 
-Every coupon an issuer pays on a public ledger is a published treasury statement: who was paid, when, how much. Institutions raise this first when evaluating tokenized private credit, and today the answer is to accept it or leave the public chain. Sigilo pays those coupons confidentially, gates them with the same identity policy that gates the token, and lets a holder disclose one payment to an auditor without opening anything else.
+Every coupon an issuer pays on a public ledger is a published treasury statement: who was paid, when, how much. Institutions raise this first when evaluating tokenized private credit, and the answer today is to accept it or leave the public chain. Sigilo pays those coupons confidentially, gates them with the same identity policy that gates the token, and lets a holder disclose one payment to an auditor without opening anything else.
 
 ---
 
@@ -23,15 +23,15 @@ Reproduced on testnet, every hash public.
 
 **A credential is enforced by the token.** A transfer to an address with no KYC claim is rejected on-chain; once the claim is issued, the same transfer goes through.
 
-**A coupon cycle pays without publishing amounts.** Five holders, accrued from each entry date — deliberately not pro-rata, since positions are public and proportional coupons would be recoverable from one disclosed payment. The transaction declares only `invoke_host_function`; each recipient decrypts theirs locally.
+**A coupon cycle pays without publishing amounts.** Five holders, accrued from each entry date — not pro-rata, since positions are public and proportional coupons would be recoverable from one disclosed payment. The transaction declares only `invoke_host_function`; each recipient decrypts theirs locally.
 
 **Revocation freezes, and the gap is visible first.** With the credential revoked in the register, the holder still withdrew ([`c2f2264a`](https://stellar.expert/explorer/testnet/tx/c2f2264ad3d599dac9f7205c3c987568794d83785a7085dcce39de871805aeeb)). After Sync, the same withdrawal was refused — *"user note key exists in non-membership tree"*.
 
-**An auditor verifies one payment and learns nothing else.** No wallet, no storage, no privileged access. Raise the receipt's claimed amount by a digit and the verdict flips to Refused with `Proof: no` while the other checks pass — the interface says which guarantee broke.
+**An auditor verifies one payment and learns nothing else.** No wallet, no storage, no privileged access. Raise the claimed amount by a digit and the verdict flips to Refused with `Proof: no` while the other checks pass — the interface says which guarantee broke.
 
 ### The run, with hashes
 
-Every row is a public testnet transaction.
+Every row is public.
 
 | Step | Transaction |
 |---|---|
@@ -46,7 +46,7 @@ The bolded row is the one to open: a successful withdrawal by a holder already r
 
 ### The wallet's own run, with hashes
 
-Driven through [`app/wallet.html`](app/wallet.html) as `inv2`, private balance read before and after each step. Separate transactions from the coupon cycle above.
+Driven through [`app/wallet.html`](app/wallet.html) as `inv2`, private balance read before and after each step.
 
 | Step | `#bal-private` | Transaction |
 |---|---|---|
@@ -54,7 +54,7 @@ Driven through [`app/wallet.html`](app/wallet.html) as `inv2`, private balance r
 | **Private send, 3 XLM to `inv5`** | 397.2291667 → 394.2291667 | [`6443916…`](https://stellar.expert/explorer/testnet/tx/6443916a4efd27590b1216a10d444261da792d01c196f68fef6d3b1279f7f80a) |
 | Withdraw 2 XLM to the public address | 394.2291667 → 392.2291667 | [`072394c…`](https://stellar.expert/explorer/testnet/tx/072394c8f7c6604ce26a07e8649155988583e05de24056fcd3fa816f8195588b) |
 
-All three return `"status":"SUCCESS"`. Searching the **decoded** XDR for the literal stroop amount finds it **11 times** in the deposit and **6** in the withdrawal — and **0 times** in the transfer. The two public rows are the control: value crossing the pool boundary is public by construction, so the transfer's zero is a measurement rather than a broken search. (Grepping the *base64* response, as is tempting, passes on every transaction ever made.) Method, structural checks, and the one step this run could not produce: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#the-wallets-own-run).
+All three return `"status":"SUCCESS"`. Searching the **decoded** XDR for the literal stroop amount finds it **11 times** in the deposit and **6** in the withdrawal — and **0 times** in the transfer. The two public rows are the control: value crossing the pool boundary is public by construction, so the transfer's zero is a measurement, not a broken search. (Grepping the *base64* response passes on every transaction ever made.) Method and structural checks: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#the-wallets-own-run).
 
 Full sequence and enforcement semantics: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#reference-run). Step-by-step walkthrough: [docs/DEMO.md](docs/DEMO.md).
 
@@ -64,7 +64,9 @@ A confidential balance is only worth holding if you can prove one line of it. Hi
 
 **[`app/wallet.html`](app/wallet.html)** is the holder's side as its own page: the balance decrypted locally, a private send, a deposit, a withdrawal the policy gate can refuse, the payment history, the enrolment check — and a receipt for one payment, verified on the same page by a panel with no keys, no storage and no account.
 
-**Nothing on the page is readable off it.** The amounts come out of note ciphertexts with the holder's own key; an observer reading the same transactions sees `invoke_host_function` and two addresses. **Disclosure is theirs to give** — the circuit requires the note's spending key, so not even the issuer can produce a receipt on their behalf, and each field is marked *proven* or *attested*. **The withdrawal is where the policy gate is felt:** a blocklisted holder is refused client-side, before a transaction exists, over coupons they already held — and a refusal for any other reason is reported as itself. **The enrolment is checkable by the person it was done to:** the wallet re-derives the allow-list leaf from the holder's own key and compares. Each of these in full: [ARCHITECTURE.md](docs/ARCHITECTURE.md#the-holders-wallet).
+**Nothing on the page is readable off it.** Amounts come out of note ciphertexts with the holder's own key; an observer sees `invoke_host_function` and two addresses. **Disclosure is theirs to give** — the circuit requires the note's spending key, so not even the issuer can produce a receipt on their behalf, and each field is marked *proven* or *attested*. **The enrolment is checkable by the person it was done to:** the wallet re-derives the allow-list leaf from the holder's own key and compares. Each in full: [ARCHITECTURE.md](docs/ARCHITECTURE.md#the-holders-wallet).
+
+**The withdrawal is where the policy gate is felt.** Revoking `inv2` left the balance readable and unspendable — **refused**, `Error(Contract, #7)`, over coupons already held. The bridge call that froze it takes no key: it read the `Enrolment`, and the event names that same `note_key`. [The run, with hashes](docs/ARCHITECTURE.md#the-freeze-driven-through-the-fixed-bridge).
 
 **What the wallet is not.** It opens the five seeded holders from throwaway keys, not an account you own; a real one holds a single key and asks a browser extension for it. Proving is real work — roughly 9–13 s of Groth16 per operation, in a worker, and the page says so rather than looking hung.
 
@@ -106,17 +108,17 @@ Confidentiality, not anonymity. Being precise about the boundary is the point.
 
 Public membership, retroactive revocation, the leaf at `grant`, and the consent enrolment requires are each stated as what was traded for what in [ARCHITECTURE.md](docs/ARCHITECTURE.md#the-trade-offs-behind-those-rows). One belongs here — it is a negative result, not a design choice.
 
-**The reasoning that is right at `grant` was wrong at `revoke`, and that one was a safety hole.** A wrong allow-list leaf only ever denied its own holder service. But freezing means inserting a holder's *note key* into the blocklist, and `revoke` used to take that key as an argument — the credential check ran against the `holder` named in the call while the write acted on whatever key was passed, with nothing joining them. An operator could pass the gate with an uncredentialed decoy of their own, hand it a credentialed holder's note key (public by design), and freeze an investor in good standing. Treating both cases as one liveness trade-off is how it went unnoticed. It is closed: `revoke` and `restore` take no key, reading the `Enrolment` written when the register approved that holder, and a reverse index refuses binding one holder's key to another (`NoteKeyBound`, #7). Test `a_decoy_holder_cannot_be_used_to_freeze_a_third_party` fails if that guard is removed. **The testnet deployment still runs the version with the defect** — [why it cannot be upgraded in place](docs/ARCHITECTURE.md#the-bridge-is-a-contract).
+**The reasoning that is right at `grant` was wrong at `revoke`, and that one was a safety hole.** A wrong allow-list leaf only ever denied its own holder service. But freezing inserts a holder's *note key* into the blocklist, and `revoke` used to take that key as an argument — the credential check ran against the `holder` named in the call while the write acted on whatever key was passed, nothing joining them. An operator could pass the gate with an uncredentialed decoy of their own, hand it a credentialed holder's note key (public by design), and freeze an investor in good standing. Treating both cases as one liveness trade-off is how it went unnoticed. It is closed: `revoke` and `restore` take no key, reading the `Enrolment` written when the register approved that holder, and a reverse index refuses binding one holder's key to another (`NoteKeyBound`, #7). Test `a_decoy_holder_cannot_be_used_to_freeze_a_third_party` fails without that guard. The old bridge could not be upgraded in place — it owns its trees permanently, the same property that makes the gate real — so the fix meant [new trees and a new bridge](docs/ARCHITECTURE.md#deployment-stellar-testnet), with the pool re-pointed rather than redeployed. Old ids are superseded, not deleted.
 
 ## What is ours, and what is not
 
-Judges here will see many demos built on the same two libraries, so this is the line — drawn after you have seen what it produced.
+Judges here will see many demos on the same two libraries, so this is the line — drawn after you have seen what it produced.
 
 **Not ours.** The privacy pool, its Groth16 circuits, the ASP contracts and the web SDK are Nethermind's [stellar-private-payments](https://github.com/NethermindEth/stellar-private-payments). The permissioned-token suite is OpenZeppelin's [RWA / ERC-3643 implementation](https://github.com/OpenZeppelin/stellar-contracts). Both Apache-2.0, unmodified, pinned by commit in [NOTICE](NOTICE).
 
-**Ours.** [`contracts/policy-bridge`](contracts/policy-bridge) — 368 lines plus 526 of tests: the on-chain policy gate closing the gap this README opens with. To put it in front of your own registry and pool, see [Using it in your own deployment](docs/ARCHITECTURE.md#using-it-in-your-own-deployment). Also ours: the coupon service, the three-role demo interface, the holder wallet, the local signer, and the deployment scripts.
+**Ours.** [`contracts/policy-bridge`](contracts/policy-bridge) — 368 lines plus 526 of tests: the on-chain policy gate closing the gap this README opens with. To use it with your own registry and pool: [Using it in your own deployment](docs/ARCHITECTURE.md#using-it-in-your-own-deployment). Also ours: the coupon service, the three-role demo interface, the holder wallet, the local signer, and the deployment scripts.
 
-It owns both lists and consults the registry before moving either, so an operator can neither invent a credential nor manufacture a freeze against an investor in good standing — enforced by `NotCredentialed` (#2), `StillCredentialed` (#3), the stored `Enrolment` that `revoke` reads instead of taking a key, and `NoteKeyBound` (#7). Their own attempt to reach the lists is refused by the network:
+It owns both lists and consults the registry before moving either, so an operator can neither invent a credential nor manufacture a freeze against an investor in good standing — enforced by `NotCredentialed` (#2), `StillCredentialed` (#3), the stored `Enrolment` `revoke` reads instead of taking a key, and `NoteKeyBound` (#7). Their attempt to reach the lists directly is refused by the network:
 
 ```
 error: Missing signing key for account CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID

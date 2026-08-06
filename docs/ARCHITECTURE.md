@@ -29,17 +29,18 @@ The retroactive freeze is the interesting property for an institutional reader: 
 ## The bridge is a contract
 
 [`contracts/policy-bridge`](../contracts/policy-bridge) owns both association sets and moves them only after asking the identity register itself. Deployed at
-[`CCCVU6BZ…`](https://stellar.expert/explorer/testnet/contract/CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID).
+[`CDMAWFOV…`](https://stellar.expert/explorer/testnet/contract/CDMAWFOVVDFTBVK6D5DFL4K5BKYYZKYRXU5EOEHLR4KS5BDD6OPSVL6J).
 
-> **That deployed instance predates the binding fix below.** Every hash on this
-> page was produced against it and each one is a real run, so none of them are
-> withdrawn — but the contract at that address is the version whose `revoke`
-> takes a `note_key` argument, and it carries the defect described in the next
-> section. It cannot be upgraded in place: it permanently administers the two
-> association trees and exposes no `update_admin` passthrough, which is the same
-> property that makes the gate non-circumventable. Shipping the fix means
-> deploying new trees and a new bridge, and that redeployment has not been done.
-> The source in this repository is fixed; the testnet deployment is not.
+> **Superseded, 2026-08-06.** `CCCVU6BZ…` was the first bridge: the version whose
+> `revoke` takes a `note_key` argument, carrying the defect described below. It
+> could not be upgraded in place — it permanently administers its two association
+> trees and exposes no `update_admin` passthrough, which is the same property that
+> makes the gate non-circumventable — so the fix required new trees and a new
+> bridge. Every hash produced against it is a real run and none are withdrawn;
+> they simply narrate the earlier deployment. The current bridge is
+> [`CDMAWFOV…`](https://stellar.expert/explorer/testnet/contract/CDMAWFOVVDFTBVK6D5DFL4K5BKYYZKYRXU5EOEHLR4KS5BDD6OPSVL6J),
+> and the pool was re-pointed at the new trees rather than redeployed, so balances
+> and note keys carried across untouched.
 
 Both directions are gated, which is what makes it more than automation:
 
@@ -187,8 +188,19 @@ Own instance — the reference deployment's association sets are admin-gated by 
 | Contract | Address |
 |---|---|
 | Pool (allowlist + blocklist) | `CCOCML4RJ7GO4MZS4OMD63W3HRJFXEIJBWRQGQTMOB35PDUBMLREN7WH` |
-| ASP membership (allowlist) | `CBWRBDQOXMIOR3MJCHIZHIQPKRCRFPQOACM6COHLXKMLRR3LYJQIGKAO` |
-| ASP non-membership (blocklist) | `CB4AQSEAICIMFQEJCPWOJNCMEJ57SQYXFTBMS42Y2LDZA6LLPPHMFBRL` |
+| ASP membership (allowlist) | `CCZJUKCXYMODH2Y5VOO3UYOY23RT5PGYXD7XJ4ME3NTM4WS5OJNXO357` |
+| ASP non-membership (blocklist) | `CB7VRFUMDI3QZPP365GWRT2A2CEHTDJR2VVVNA6HKUQAKSZZBG2NFFZU` |
+| Policy bridge | `CDMAWFOVVDFTBVK6D5DFL4K5BKYYZKYRXU5EOEHLR4KS5BDD6OPSVL6J` |
+
+**Superseded on 2026-08-06**, when the binding fix required new trees. Left here because the published hashes above narrate them, and evidence of a run that happened is not withdrawn because the code moved on:
+
+| Contract | Address | Why |
+|---|---|---|
+| ASP membership (allowlist) | `CBWRBDQOXMIOR3MJCHIZHIQPKRCRFPQOACM6COHLXKMLRR3LYJQIGKAO` | admin is the old bridge, permanently |
+| ASP non-membership (blocklist) | `CB4AQSEAICIMFQEJCPWOJNCMEJ57SQYXFTBMS42Y2LDZA6LLPPHMFBRL` | admin is the old bridge, permanently |
+| Policy bridge | `CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID` | `revoke` took an unbound `note_key` |
+
+The pool was **re-pointed**, not redeployed — `update_asp_membership` and `update_asp_non_membership`, called by its admin — so every balance and every note key carried across. Holders were re-granted into the new allowlist with the leaves and keys they already had.
 | Groth16 verifier (AB policy) | `CCKYMOHY4GDQMVKZFATOIOAJ6HCXAUXKBWQC3L5ZQYJNAIJ7DMIONADZ` |
 | Public key registry | `CBJKSJGUAN7SAJ5ZBAL6K3VWHV7YD6PYTWSOEG2G43ZPMVEK4GV23ELJ` |
 
@@ -296,7 +308,25 @@ The confidentiality check runs on **decoded** XDR. Encoded integers are binary, 
 
 Deposit and withdrawal are the positive control — value crossing the pool boundary is public by construction, and the identical method finds it both times. The transfer's zero is therefore a measurement rather than a failed search. That transaction carries `new_commitment` ×4, `new_nullifier` ×4 and `encrypted_output` ×6, and exposes no `amount` field in its envelope; `inv5` reads it as `3.00` locally from the note ciphertext.
 
-**Not recorded:** the revoke → sync → refused-withdrawal step. The bridge at `CCCVU6BZ…` predates the binding fix and exposes the old `revoke(holder, note_key)` arity, so `scripts/policy-bridge.sh sync` cannot drive it. That refusal is already published in the coupon-cycle run above, and it is enforced by the pool's association-set check rather than by the bridge — so it would look the same before and after the fix either way.
+### The freeze, driven through the fixed bridge
+
+Run after the redeploy, as `inv2`, against `CDMAWFOV…`:
+
+| Step | Result | Transaction |
+|---|---|---|
+| Revoke `inv2`'s KYC claim in the register | `ClaimRemoved` | [`e0c3aa4…`](https://stellar.expert/explorer/testnet/tx/e0c3aa4b7389c01679d0f97e468fb48acdea0ae366d8ab9cf8fd37efaff65d76) |
+| `sync` → bridge `revoke(holder)`, **no key argument** | `credential absent → blocklisted` | [`ea3c999…`](https://stellar.expert/explorer/testnet/tx/ea3c999b50377af6f5f6325a58da2469c7ad2035c46e23dfb205d5896ad2921f) |
+| Wallet withdrawal of 2 XLM | **refused** — `Error(Contract, #7)` from the pool | — |
+| Restore the claim, `sync` back | `credential restored → unfrozen` | [`bb5fed4…`](https://stellar.expert/explorer/testnet/tx/bb5fed4c10e7003ec890e71339ada5971ecf8526a85cc60900c5686a0f49de21) |
+
+The middle row is the one the old deployment could not produce: `revoke` takes no key, so the bridge had to read `Enrolment(inv2)` to know what to freeze. Decoding the `PolicyChanged` event it emitted, against the enrolment itself:
+
+```
+event  → { leaf: 536237045…839636, note_key: 1399718337…760248 }
+enrolment(inv2) → { leaf: 536237045…839636, note_key: 1399718337…760248 }
+```
+
+Identical. The key frozen is provably the key the register approved, and an auditor reads that off the chain rather than taking it on trust — which the old event, carrying no key at all, made impossible.
 
 Proving takes roughly 9 s of CPU per operation. The revocation block surfaces client-side, when the wallet assembles its proof context — the association-set check fails before a transaction is ever built.
 
