@@ -12,6 +12,8 @@ Sigilo binds OpenZeppelin's ERC-3643 permissioned token to Nethermind's confiden
 
 Every coupon an issuer pays on a public ledger is a published treasury statement: who was paid, when, how much. Institutions raise this first when they evaluate tokenized private credit, and today the answer is to accept it or leave the public chain. Sigilo pays those coupons confidentially, gates them with the same identity policy that gates the token, and lets a holder disclose one payment to an auditor without opening anything else.
 
+The holder's half of that has a page of its own — see [The wallet](#the-wallet).
+
 ---
 
 ## The demonstration
@@ -89,6 +91,24 @@ Each of these is a decision, not an oversight. They are stated as what was trade
 
 **Enrolment needs the holder's consent, and the interface says so.** An allow-list leaf commits to the holder's ASP secret, which is theirs. Handing it over is what makes them identifiable to the policy operator. The demo reads it from the CLI's local state; a real deployment collects it during onboarding, and the holder knows it did.
 
+## The wallet
+
+A confidential balance is only worth holding if you can prove one line of it. That is the half most privacy wallets leave out, and it is the half that decides whether a holder can answer an accountant, a counterparty or a regulator without surrendering everything else at the same time. Hiding a balance is the easy part. Opening exactly one payment out of it, to someone who holds no keys, is the part that makes the hiding usable.
+
+**[`app/wallet.html`](app/wallet.html)** is the holder's side as its own page: the balance decrypted locally, a private send, a deposit, a withdrawal the policy gate can refuse, the payment history — and a receipt for one payment, verified on the same page by a panel with no keys, no storage and no account. Linked from the demo's header; it navigates rather than opening a tab, because the storage lock allows one page at a time.
+
+The demo's Investor tab is the same rail seen from inside the issuer's story. This is that rail told from the end that holds the money.
+
+**Nothing on the page is readable off it.** The amounts come out of note ciphertexts with the holder's own key. An observer reading the same transactions on an explorer sees `invoke_host_function` and two addresses — the position is public because a securities register should be, and every coupon paid against it is not.
+
+**Disclosure is theirs to give.** The holder picks one payment and proves that payment: the circuit requires the note's spending key, so not even the issuer can produce it on their behalf. Each disclosed field is marked **proven** or **attested**, because a zero-knowledge proof and a claim someone made are different objects and a receipt that blurs them is worse than no receipt. Raise the claimed amount by one digit and the verdict flips to Refused with `Proof: no` while the other checks still pass — the panel says which guarantee broke, not merely that one did.
+
+**The withdrawal is where the policy gate is felt.** A blocklisted holder is refused client-side, before a transaction exists, over coupons they already held. A refusal for any other reason — an empty balance, no spendable note — is reported as itself: the freeze is named only when the rail actually named it.
+
+**The one holder-side check that is not here yet.** A holder can re-derive the allow-list leaf enrolled in their name from their own key and compare it — which is what turns [the leaf trade-off above](#the-trade-offs-behind-those-rows) into something detectable rather than something to be told. It runs in the demo's Investor view, not in this page. It belongs in the wallet, and moving it is the obvious next step.
+
+**What the wallet is not.** It opens the five seeded holders from throwaway keys, not an account you own; a real one holds a single key and asks a browser extension for it. Send, deposit and withdraw invoke the pool's own calls and are not part of the recorded reference run above — that run demonstrates the coupon cycle, the freeze and the disclosure. Proving is real work: roughly 9–13 s of Groth16 per operation, in a worker, and the page says so rather than looking hung.
+
 ## Using it in your own deployment
 
 The reusable piece is [`contracts/policy-bridge`](contracts/policy-bridge) — one Soroban contract, 203 lines. Everything else in this repository exists to demonstrate it.
@@ -147,7 +167,7 @@ error: Missing signing key for account CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMK
 
 That account is the contract. It has no private key, and its only entrypoints check the registry.
 
-Also ours: the coupon service (accrual, payment cycle), the three-role demo interface, the local signer, and the deployment scripts.
+Also ours: the coupon service (accrual, payment cycle), the three-role demo interface, the holder wallet, the local signer, and the deployment scripts.
 
 ## Running the demo
 
@@ -184,22 +204,12 @@ The browser signs with **local seed keys**, not a wallet extension — a recorde
 
 Editing the registry and moving the allow-list and blocklist need the issuer's admin key and the Stellar CLI, so they run in [app/server.mjs](app/server.mjs) rather than the page. In a real deployment that is the securitiser's internal service.
 
-The three roles share one page because they must: the payment SDK's storage holds an exclusive OPFS lock, and a second tab evicts the first.
-
-## The holder's side
-
-The same system, told from the wallet end — what a holder controls, and what they can check without asking anyone. It has its own page: **[`app/wallet.html`](app/wallet.html)** — a confidential balance, a private send, a withdrawal the policy gate can refuse, and a receipt that proves one payment. Linked from the demo's header; it navigates rather than opening a tab, because the payment SDK's storage lock allows one page at a time.
-
-**The membership secret is theirs.** Proving membership in the allow-list needs a secret derived from the holder's own key. The issuer never holds it and the page never sees it: the Investor view calls `deriveAspUserLeaf()` on the holder's own account and compares the result to the leaf standing on record. If they match, the enrolment made in their name is genuinely theirs — nobody enrolled a stranger in their place. This is what turns the trust assumption above into something the holder can detect rather than be told about.
-
-**Enrolment is a consent, not a formality.** Handing that secret to the policy operator is what makes a holder identifiable to them. The interface says so where the exchange happens, rather than in a footnote.
-
-**Disclosure is theirs to give.** A coupon lands in the pool readable only by its recipient; the Investor view decrypts it locally. When an auditor asks, the holder picks one payment and generates a proof of that payment and nothing else — the circuit requires the note's spending key, so not even the issuer can produce it. The auditor verifies with no wallet, no storage and no privileged access, and each disclosed field is marked **proven** or **attested**, because a zero-knowledge proof and a claim are different objects.
+The three roles share one page because they must: the payment SDK's storage holds an exclusive OPFS lock, and a second tab evicts the first. The wallet is a second page for the same reason it is not a second tab — [app/js/sdk-facade.js](app/js/sdk-facade.js) claims a Web Lock before opening storage, so whichever page loads second says so in about two seconds rather than hanging for thirty with the cause visible only in the console. Verification is exempt by construction: it never opens storage, so the blocked page can still check a receipt produced by the other one.
 
 ## Layout
 
 ```
-app/            three-role demo interface + issuer back-office server
+app/            three-role demo interface, holder wallet, issuer back-office server
 scripts/        deployment, policy gate, credential and key management
 tools/          leaf derivation, receipt verification probe
 vendor/         rebuilt payment SDK, pinned against our own deployment

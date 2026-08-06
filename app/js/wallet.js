@@ -34,8 +34,16 @@ function setProgress(id, text, stage) {
 function die(error) {
   el('fatal').hidden = false;
   el('fatal').textContent = isDbLocked(error)
-    ? 'Another tab has this app open. The confidential payment SDK keeps one exclusive local database — close the other tab and reload.'
+    ? 'Another tab has this app open. The confidential payment SDK keeps one exclusive local database — close the other tab and reload. Verification below still works: it needs no database at all.'
     : `Could not start: ${error?.message ?? error}`;
+
+  // No wallet means no pool. Left live, these answer a click with a null dereference,
+  // which reads as broken code rather than as the one condition the banner just named.
+  // The verify panel is deliberately not among them — it never opened storage.
+  for (const id of ['btn-send', 'btn-withdraw', 'btn-deposit', 'btn-disclose']) {
+    el(id).disabled = true;
+  }
+
   console.error(error);
 }
 
