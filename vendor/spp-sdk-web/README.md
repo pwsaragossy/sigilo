@@ -15,8 +15,11 @@ Sigilo needs to grant and revoke credentials on its *own* association sets, so i
 its own instance — which means the SDK has to be rebuilt against it.
 
 Verified: `stellar_private_payments_sdk_web_bg.wasm` contains our pool
-(`CCOCML4RJ7GO4MZS4OMD63W3HRJFXEIJBWRQGQTMOB35PDUBMLREN7WH`) and no reference to the
-reference deployment.
+(`CCSA2A6HIDEZKR5LND5JD3AYF4ER6YL43H4VNOCWQ6MJGHSIRGK7VWQH`) and no reference to the
+reference deployment. Check it with `strings … | grep -oE 'C[A-Z0-9]{55}'` — a text
+grep of the directory will not find these, which is how a stale build went unnoticed
+once already: the SDK proved against the previous association roots while the pool
+checked the current ones, and every spend failed with `InvalidProof`.
 
 ## Provenance
 
@@ -25,7 +28,7 @@ reference deployment.
 | Source | [NethermindEth/stellar-private-payments](https://github.com/NethermindEth/stellar-private-payments) @ `461c1d0` |
 | License | Apache-2.0 (see `dist/LICENSE.txt` and `dist/licenses/`) |
 | Built with | `wasm-bindgen-cli` 0.2.126, binaryen 131, Rust 1.97.1 |
-| Deployment | Sigilo testnet instance, ledger 3958947 |
+| Deployment | Sigilo testnet instance, ledger 4003050 |
 
 ## Rebuilding
 

@@ -29,19 +29,16 @@ The retroactive freeze is the interesting property for an institutional reader: 
 ## The bridge is a contract
 
 [`contracts/policy-bridge`](../contracts/policy-bridge) owns both association sets and moves them only after asking the identity register itself. Deployed at
-[`CDMAWFOV…`](https://stellar.expert/explorer/testnet/contract/CDMAWFOVVDFTBVK6D5DFL4K5BKYYZKYRXU5EOEHLR4KS5BDD6OPSVL6J).
+[`CD63ZKLY…`](https://stellar.expert/explorer/testnet/contract/CD63ZKLYQ2I3O3EJRAHIMPZQO424VGZHOG7INSY7IY3BYJZI2D6RHXRU).
 
-> **Superseded, 2026-08-06.** `CCCVU6BZ…` was the first bridge: the version whose
-> `revoke` takes a `note_key` argument, carrying the defect described below. It
-> could not be upgraded in place — it permanently administers its two association
-> trees and exposes no `update_admin` passthrough, which is the same property that
-> makes the gate non-circumventable — so the fix required new trees and a new
-> bridge. Every hash produced against it is a real run and none are withdrawn;
-> they simply narrate the earlier deployment. The current bridge is
-> [`CDMAWFOV…`](https://stellar.expert/explorer/testnet/contract/CDMAWFOVVDFTBVK6D5DFL4K5BKYYZKYRXU5EOEHLR4KS5BDD6OPSVL6J),
-> and the pool was re-pointed at the new trees rather than redeployed, so balances
-> and note keys carried across. Spending against the new trees is currently broken;
-> see [Known defect in the current deployment](#known-defect-in-the-current-deployment).
+> **Superseded, 2026-08-06.** `CCCVU6BZ…` was the first bridge — the version whose
+> `revoke` takes a `note_key` argument, carrying the defect described below. It could
+> not be upgraded in place: it permanently administers its association trees and
+> exposes no `update_admin` passthrough, the same property that makes the gate
+> non-circumventable. Fixing it therefore meant a new rail, not a new contract.
+> Every hash produced against the old one is a real run and none are withdrawn; they
+> narrate the earlier deployment. See [Deployment](#deployment-stellar-testnet) for
+> what replaced what, and why the web SDK had to be rebuilt alongside it.
 
 Both directions are gated, which is what makes it more than automation:
 
@@ -188,24 +185,35 @@ Own instance — the reference deployment's association sets are admin-gated by 
 
 | Contract | Address |
 |---|---|
-| Pool (allowlist + blocklist) | `CCOCML4RJ7GO4MZS4OMD63W3HRJFXEIJBWRQGQTMOB35PDUBMLREN7WH` |
-| ASP membership (allowlist) | `CCZJUKCXYMODH2Y5VOO3UYOY23RT5PGYXD7XJ4ME3NTM4WS5OJNXO357` |
-| ASP non-membership (blocklist) | `CB7VRFUMDI3QZPP365GWRT2A2CEHTDJR2VVVNA6HKUQAKSZZBG2NFFZU` |
-| Policy bridge | `CDMAWFOVVDFTBVK6D5DFL4K5BKYYZKYRXU5EOEHLR4KS5BDD6OPSVL6J` |
+| Pool (allowlist + blocklist) | `CCSA2A6HIDEZKR5LND5JD3AYF4ER6YL43H4VNOCWQ6MJGHSIRGK7VWQH` |
+| ASP membership (allowlist) | `CCF5SK3J3PSCYGK34NPUTELDT6F2L7CBGZEPALF4OQZRBV4GU3G5KZFB` |
+| ASP non-membership (blocklist) | `CCW5FJGJHAJWFB2FIBDIHQU5VUUUA6I7ISP7NG4HVBDT6FJ6DPZC77KO` |
+| Groth16 verifier (AB policy) | `CCTFLBRUBKABHAVIR42HFVRXMOX3GD4NMRPN25LBQDJJPADHS3HSWYSV` |
+| Public key registry | `CAR5OEI73DUKG6GRQO5OH2SYCDEEJSIPYLKQDS6CMPALPPMC6FQZO2VJ` |
+| Policy bridge | `CD63ZKLYQ2I3O3EJRAHIMPZQO424VGZHOG7INSY7IY3BYJZI2D6RHXRU` |
 
-**Superseded on 2026-08-06**, when the binding fix required new trees. Left here because the published hashes above narrate them, and evidence of a run that happened is not withdrawn because the code moved on:
+**Superseded on 2026-08-06**, and left here because the published hashes narrate them.
+Evidence of a run that happened is not withdrawn because the code moved on.
 
-| Contract | Address | Why |
-|---|---|---|
-| ASP membership (allowlist) | `CBWRBDQOXMIOR3MJCHIZHIQPKRCRFPQOACM6COHLXKMLRR3LYJQIGKAO` | admin is the old bridge, permanently |
-| ASP non-membership (blocklist) | `CB4AQSEAICIMFQEJCPWOJNCMEJ57SQYXFTBMS42Y2LDZA6LLPPHMFBRL` | admin is the old bridge, permanently |
-| Policy bridge | `CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID` | `revoke` took an unbound `note_key` |
+| Contract | Address |
+|---|---|
+| Pool | `CCOCML4RJ7GO4MZS4OMD63W3HRJFXEIJBWRQGQTMOB35PDUBMLREN7WH` |
+| ASP membership | `CBWRBDQOXMIOR3MJCHIZHIQPKRCRFPQOACM6COHLXKMLRR3LYJQIGKAO` |
+| ASP non-membership | `CB4AQSEAICIMFQEJCPWOJNCMEJ57SQYXFTBMS42Y2LDZA6LLPPHMFBRL` |
+| Policy bridge | `CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID` |
 
-The pool was **re-pointed**, not redeployed — `update_asp_membership` and `update_asp_non_membership`, called by its admin — so every balance and every note key carried across. Holders were re-granted into the new allowlist with the leaves and keys they already had.
-| Groth16 verifier (AB policy) | `CCKYMOHY4GDQMVKZFATOIOAJ6HCXAUXKBWQC3L5ZQYJNAIJ7DMIONADZ` |
-| Public key registry | `CBJKSJGUAN7SAJ5ZBAL6K3VWHV7YD6PYTWSOEG2G43ZPMVEK4GV23ELJ` |
+**Why the whole rail moved, not just the bridge.** The trees answer permanently to
+the bridge that took them, so a fixed bridge needs new trees. Two constraints follow,
+and both were learned the hard way. The web SDK compiles its deployment in —
+`sdk/web/src/lib.rs` does `include_str!` on `deployments.json` and `Client.new` takes
+no override — so a new rail means [rebuilding the vendored
+SDK](../vendor/spp-sdk-web/README.md#rebuilding); until that is done the SDK proves
+against the old association roots while the pool checks the new ones, and every spend
+fails with `InvalidProof`. And the treasury's leaf must be inserted into the allowlist
+*before* the handover: it has no identity contract, so the register can never vouch
+for it and the bridge can never grant it. Miss that and nothing can fund the pool.
 
-Deployed at ledger 3958947. Trees: 10 levels. Proofs: Groth16 over BN254, verified on-chain through native host functions (CAP-0074, CAP-0080).
+Deployed at ledger 4003050. Trees: 10 levels. Proofs: Groth16 over BN254, verified on-chain through native host functions (CAP-0074, CAP-0080).
 
 ## Permissioned token (Stellar testnet)
 
@@ -328,36 +336,48 @@ enrolment(inv2) → { leaf: 536237045…839636, note_key: 1399718337…760248 }
 
 Identical. The key frozen is provably the key the register approved, and an auditor reads that off the chain rather than taking it on trust — which the old event, carrying no key at all, made impossible.
 
-> **Retracted, and why.** An earlier version of this table carried a fourth row:
-> a wallet withdrawal "refused — `Error(Contract, #7)`", presented as the freeze
-> being felt by the holder. That reading was wrong. Pool error #7 is
-> `InvalidProof`, not a policy refusal, and the same error appears for holders
-> who were never revoked. It is a real defect in the redeployed rail, described
-> below — not evidence of the gate working. The row is withdrawn rather than
-> quietly deleted, because a project that publishes its negative results does not
-> get to make an exception when the negative result is its own overclaim.
+> **Retracted, and why.** An earlier version of this table carried a wallet
+> withdrawal "refused — `Error(Contract, #7)`", presented as the freeze being felt by
+> the holder. That reading was wrong twice over: pool error #7 is `InvalidProof`, not
+> a policy refusal, and it was appearing for holders who had never been revoked. It
+> was the SDK proving against stale association roots — the defect described under
+> [Deployment](#deployment-stellar-testnet) — not the gate working. The row is
+> withdrawn rather than quietly deleted, because a project that publishes its negative
+> results does not get to make an exception when the negative result is its own
+> overclaim.
 
-### Known defect in the current deployment
+### The freeze, felt from the wallet
 
-Since the trees were replaced, **no holder can spend against them**. Every
-transfer and withdrawal fails simulation with `Error(Contract, #7)`
-`InvalidProof` from the pool, for revoked and unrevoked holders alike.
+Re-run after the rail was rebuilt and the SDK rebuilt against it, driven through
+[`app/wallet.html`](../app/wallet.html) as `inv2`:
 
-What is ruled out: the pool reads the new trees correctly and their roots match
-`get_root` on both contracts, so the root-equality checks at
-`pool.rs:588-598` are not what fails; and a full OPFS wipe does not change it,
-so it is not stale client state. The leaves are present in the new allowlist —
-the holders were re-granted with the same leaves and note keys they already had.
-What remains is the association-membership proof itself: these rail identities
-were established against the previous trees.
+| Step | `#bal-private` | Result |
+|---|---|---|
+| Treasury deposits 100 XLM | — | [`b5e6a58…`](https://stellar.expert/explorer/testnet/tx/b5e6a588b970e864d7b2b9bcbf6375631914c8ca8f6d3d9fbe091bec38ba0ddb) |
+| Confidential coupon, 12.34 XLM → `inv2` | → 12.34 | [`083d05f…`](https://stellar.expert/explorer/testnet/tx/083d05f54b4ec2a18f641aef16312d1eedc3b8b9ea1eabfb19fc41825dc991c8) |
+| `inv2` withdraws 2 XLM (CLI) | 12.34 → 10.34 | [`f3dd1ec…`](https://stellar.expert/explorer/testnet/tx/f3dd1ec00992c2fa954f85fca32d12cc38b69e3ec39c3db7c036091718ff5909) |
+| **`inv2` withdraws 1 XLM in the wallet** | 10.34 → 9.34 | [`f19b3fb…`](https://stellar.expert/explorer/testnet/tx/f19b3fb98dd8b75991e37298a911eb8e9567bc143bae6dbe799e6afc38168d21) |
+| Revoke `inv2`'s claim, `sync` | — | [`f4d8dd5…`](https://stellar.expert/explorer/testnet/tx/f4d8dd5a8828463726f9445e0443df637a8b02d11b0903da294753f9e7296748) |
+| **Retry the withdrawal** | 9.34, unchanged | **refused** — *"User note key exists in non-membership tree (user is blocklisted)"* |
+| Restore the claim, `sync` back | — | [`49c065f…`](https://stellar.expert/explorer/testnet/tx/49c065fb10a148fceda3ea35d769d222bd929d7e52990d6a9e40d7cadbdca9bf) |
 
-The wallet's own run above was recorded **before** the tree replacement and
-those transactions are unaffected. The coupon-cycle hashes predate it too.
+The refusal is client-side, before a transaction exists: the wallet cannot assemble a
+proof context because the association-set check fails first. The balance stays
+readable — 9.34 XLM, decrypted in the page — and unspendable, over a coupon received
+before the revocation. That is the retroactive freeze, seen from the side of the
+person it applies to.
 
-Two candidate remedies, neither yet verified: re-point the pool at the previous
-trees, which are known-good and still administered by the superseded bridge; or
-re-onboard the rail identities against the new trees, which mints new note keys
-and abandons the current pool balances, the treasury's included.
+The `revoke` that produced it takes no key. The bridge read `Enrolment(inv2)` to learn
+what to freeze, and the `PolicyChanged` event it emitted names the same pair:
+
+```
+event           → { leaf: 536237045…839636, note_key: 1399718337…760248 }
+enrolment(inv2) → { leaf: 536237045…839636, note_key: 1399718337…760248 }
+```
+
+Identical — the key frozen is provably the key the register approved, readable from
+the chain rather than taken on trust. The old event carried no key at all, which is
+what made this uncheckable.
 
 Proving takes roughly 9 s of CPU per operation. The revocation block surfaces client-side, when the wallet assembles its proof context — the association-set check fails before a transaction is ever built.
 
