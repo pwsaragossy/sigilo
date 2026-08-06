@@ -2,37 +2,17 @@
 
 **Confidential coupon payments for tokenized private credit, on Stellar.**
 
-Every coupon an issuer pays on a public ledger is a published treasury statement. Anyone with an explorer reads the payment flow: who was paid, when, how much. Institutions raise this first when they evaluate tokenized private credit, and today the answer is to accept it or leave the public chain.
+Revoking a holder's KYC credential stops them receiving new tokens, and does nothing to the money already inside the privacy pool.
 
-Sigilo pays those coupons confidentially — amounts hidden from outside observers on-chain — gates them with the same identity policy that gates the token, and lets a holder disclose one specific payment to an auditor without opening anything else.
-
-> ⚠️ Built for the [Stellar Builder Summit SP 26](https://bounties.grantfox.xyz/events/stellar-summit-sp-2026), Enterprise / Compliance / RWA sub-lane. **Testnet only**, on unaudited alpha dependencies. Not for real value.
+Everyone else proves you are on the list. Sigilo proves you are *not* — and does it where the money already is.
 
 ![One identity policy, two enforcement points](docs/img/policy-gate.svg)
 
+Sigilo binds OpenZeppelin's ERC-3643 permissioned token to Nethermind's confidential payment pool through an original Soroban contract — [`contracts/policy-bridge`](contracts/policy-bridge), 203 lines. Full attribution and pinned commits [below](#what-is-ours-and-what-is-not). Testnet only; see [Running the demo](#running-the-demo).
+
+Every coupon an issuer pays on a public ledger is a published treasury statement: who was paid, when, how much. Institutions raise this first when they evaluate tokenized private credit, and today the answer is to accept it or leave the public chain. Sigilo pays those coupons confidentially, gates them with the same identity policy that gates the token, and lets a holder disclose one payment to an auditor without opening anything else.
+
 ---
-
-## What is ours, and what is not
-
-Judges at this event will see a lot of demos built on the same two libraries. The line matters, so here it is first.
-
-**Not ours.** The privacy pool, its Groth16 circuits, the association-set (ASP) contracts and the web SDK are Nethermind's [stellar-private-payments](https://github.com/NethermindEth/stellar-private-payments). The permissioned-token suite is OpenZeppelin's [RWA / ERC-3643 implementation](https://github.com/OpenZeppelin/stellar-contracts). Both Apache-2.0, both pinned by commit in [NOTICE](NOTICE).
-
-**Ours.** [`contracts/policy-bridge`](contracts/policy-bridge) — the on-chain policy gate that binds them, and the argument for why one is needed.
-
-A permissioned token asks an identity registry who may hold it. Confidential payments prove, against an allow-list and a blocklist, who may spend. Each enforces its own policy correctly, and neither knows about the other: **revoking a holder's credential does nothing to funds already inside the pool.**
-
-The contract closes that gap and, more importantly, closes it without asking anyone to be trusted. It owns both lists and consults the registry before moving either — `grant` fails unless the registry verifies the holder, `revoke` fails while it still does. So an operator can neither invent a credential nor manufacture a freeze against an investor in good standing. Their own attempt to reach the lists directly is refused by the network:
-
-```
-error: Missing signing key for account CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID
-```
-
-That account is the contract. It has no private key.
-
-And because the pool checks proofs against the *current* list roots, a freeze reaches backwards over coupons the holder already received.
-
-Also ours: the coupon service (accrual, payment cycle), the three-role demo interface, the local signer, and the deployment scripts.
 
 ## The demonstration
 
@@ -63,6 +43,26 @@ The fifth row is the one to open. It is a successful withdrawal by a holder whos
 
 Full sequence and enforcement semantics: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#reference-run). Step-by-step walkthrough: [docs/DEMO.md](docs/DEMO.md).
 
+## Verify this yourself
+
+Nothing here asks to be taken on trust. Three checks run without our deployment, our keys, or us:
+
+```bash
+cd contracts/policy-bridge && cargo test   # 8 tests, led by the refusals:
+                                           # revoke() fails while the registry still verifies (#3)
+node tools/verify-receipt.mjs --self-test  # the vendored SDK loads outside a browser, and the
+                                           # exact receipt schema the auditor accepts
+node app/tools/key-gate.mjs                # the browser signer derives the same keys as the CLI,
+                                           # per holder — the demo's wallets are not staged
+```
+
+`cargo test` names its own argument: `refuses_to_freeze_someone_still_in_good_standing` is the constraint nobody implements, because it costs the operator flexibility and buys them nothing until an investor sues.
+
+And the two transactions that carry the whole argument, on a public explorer, no tooling at all:
+
+- [the revoked holder's withdrawal succeeding](https://stellar.expert/explorer/testnet/tx/c2f2264ad3d599dac9f7205c3c987568794d83785a7085dcce39de871805aeeb) — before the policy gate was told
+- [the same holder withdrawing again after re-credentialing](https://stellar.expert/explorer/testnet/tx/9cdd9675894941338fe0e5d053f4304f92622d0c10aa021e1877bc17c9733436)
+
 ## What is hidden, and what is not
 
 Confidentiality, not anonymity. Being precise about the boundary is the point — an enterprise reader will find these anyway.
@@ -74,15 +74,20 @@ Confidentiality, not anonymity. Being precise about the boundary is the point �
 | Addresses transacting with the pool | yes | inherent to the design — confidentiality, not anonymity |
 | Token positions | yes | a securities register should be legible to a regulator; confidential balances are future work |
 | Aggregate value the treasury funded into the pool | yes | mitigated by pre-funding in round amounts, decoupled from any cycle |
+| **Membership of the allow-list** | **yes** | a cap table, not a mixer — see below |
 | **This demo's amounts** | **recomputable** | the seed publishes the rate and the positions. In a real deployment the deal rate is the issuer's private data — that is the thing the confidential payments protect |
 
-Two more limits worth stating plainly:
+### The trade-offs behind those rows
 
-**Revocation is retroactive and total.** A blocklisted holder cannot spend *anything* in the pool, including coupons received before the revocation. This is deliberate and re-credentialing lifts it, but a payment to a revoked holder is best described as held in treasury until they are re-credentialed, not as excluded.
+Each of these is a decision, not an oversight. They are stated as what was traded for what.
 
-**The leaf derivation is trusted.** The contract removed the operator's discretion over *whether* a tree moves, but not over *what* goes into it. An allow-list leaf is `poseidon2(note_public_key, asp_secret)`, computed off-chain because the ASP secret belongs to the holder and the contract never sees it. So the guarantee is that no leaf is inserted for an address the registry refuses — not that a given leaf corresponds to the holder named alongside it. Closing that means proving the derivation on-chain, which is a larger piece of work than this one.
+**Membership is public, and the set is small.** This deployment has five holders. A regulated issuance has tens, not tens of thousands, and every association-root transition is a public subtraction against that set — so a revocation is a timestamped, attributable event. Amounts stay hidden; membership does not. That is the correct shape for a securities register and the wrong shape for a mixer, and Sigilo is the first one. Pooling across issuers would enlarge the set, and immediately raises whose policy binds whom — unsolved here, and named rather than papered over.
 
-**Enrolment needs the holder's consent.** An allow-list leaf commits to the holder's ASP secret, which is theirs. Handing it over is what makes them identifiable to the policy operator; the demo takes it from the CLI's local state, a real deployment would collect it during onboarding.
+**Revocation is retroactive and total, and that is the point.** A blocklisted holder cannot spend *anything* in the pool, including coupons received before the revocation. Surgical revocation would leave a sanctioned holder free to spend every pre-revocation coupon — exactly the failure this project exists to prevent. The cost is that a payment to a revoked holder is best described as held until they are re-credentialed, not as excluded. Re-credentialing lifts it.
+
+**The leaf derivation is trusted — and the failure is liveness, not safety.** An allow-list leaf is `poseidon2(note_public_key, asp_secret)`, computed off-chain because the ASP secret belongs to the holder and the contract never sees it. So the guarantee is that no leaf is inserted for an address the registry refuses, not that a given leaf belongs to the holder named beside it. An operator who inserts a wrong leaf denies that holder service — which they could already do by refusing to onboard them. They cannot use it to let an uncredentialed party spend, because the pool still requires a valid proof against a real note. Proving the derivation on-chain removes the assumption; that is a larger piece of work than this one. In the meantime the holder can **check it themselves** — the Investor view re-derives the leaf from their own key and compares it to the one on record.
+
+**Enrolment needs the holder's consent, and the interface says so.** An allow-list leaf commits to the holder's ASP secret, which is theirs. Handing it over is what makes them identifiable to the policy operator. The demo reads it from the CLI's local state; a real deployment collects it during onboarding, and the holder knows it did.
 
 ## Using it in your own deployment
 
@@ -124,7 +129,29 @@ stellar contract invoke --id <allowlist> --source <issuer> -- insert_leaf --leaf
 
 **The honest limit on portability.** Those function names and arities are how the contract talks to its neighbours, and they match Nethermind's ASP contracts and OpenZeppelin's verifier at the pinned commits. Different components mean editing those call sites — the pattern transfers, the exact invocations may not. And this is testnet work on unaudited alpha dependencies: adopt the design, not this build, for anything holding real value.
 
+## What is ours, and what is not
+
+Judges at this event will see a lot of demos built on the same two libraries, so here is the line, drawn after you have seen what it produced.
+
+**Not ours.** The privacy pool, its Groth16 circuits, the association-set (ASP) contracts and the web SDK are Nethermind's [stellar-private-payments](https://github.com/NethermindEth/stellar-private-payments). The permissioned-token suite is OpenZeppelin's [RWA / ERC-3643 implementation](https://github.com/OpenZeppelin/stellar-contracts). Both Apache-2.0, both used unmodified, both pinned by commit in [NOTICE](NOTICE).
+
+**Ours.** [`contracts/policy-bridge`](contracts/policy-bridge) — 203 lines, plus 265 lines of tests. The on-chain policy gate that binds the two, and the argument for why one is needed.
+
+A permissioned token asks an identity registry who may hold it. Confidential payments prove, against an allow-list and a blocklist, who may spend. Each enforces its own policy correctly, and neither knows about the other: **revoking a holder's credential does nothing to funds already inside the pool.**
+
+The contract closes that gap without asking anyone to be trusted. It owns both lists and consults the registry before moving either — `grant` fails unless the registry verifies the holder, `revoke` fails while it still does. So an operator can neither invent a credential nor manufacture a freeze against an investor in good standing. Their own attempt to reach the lists directly is refused by the network:
+
+```
+error: Missing signing key for account CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID
+```
+
+That account is the contract. It has no private key, and its only entrypoints check the registry.
+
+Also ours: the coupon service (accrual, payment cycle), the three-role demo interface, the local signer, and the deployment scripts.
+
 ## Running the demo
+
+> ⚠️ Built for the [Stellar Builder Summit SP 26](https://bounties.grantfox.xyz/events/stellar-summit-sp-2026). **Testnet only**, on unaudited alpha dependencies. Not for real value.
 
 Needs the Stellar CLI, Rust, Node 22+, `jq`, and clones of the two upstream repositories at the pinned commits.
 
@@ -157,6 +184,16 @@ The browser signs with **local seed keys**, not a wallet extension — a recorde
 Editing the registry and moving the allow-list and blocklist need the issuer's admin key and the Stellar CLI, so they run in [app/server.mjs](app/server.mjs) rather than the page. In a real deployment that is the securitiser's internal service.
 
 The three roles share one page because they must: the payment SDK's storage holds an exclusive OPFS lock, and a second tab evicts the first.
+
+## The holder's side
+
+The same system, told from the wallet end — what a holder controls, and what they can check without asking anyone.
+
+**The membership secret is theirs.** Proving membership in the allow-list needs a secret derived from the holder's own key. The issuer never holds it and the page never sees it: the Investor view calls `deriveAspUserLeaf()` on the holder's own account and compares the result to the leaf standing on record. If they match, the enrolment made in their name is genuinely theirs — nobody enrolled a stranger in their place. This is what turns the trust assumption above into something the holder can detect rather than be told about.
+
+**Enrolment is a consent, not a formality.** Handing that secret to the policy operator is what makes a holder identifiable to them. The interface says so where the exchange happens, rather than in a footnote.
+
+**Disclosure is theirs to give.** A coupon lands in the pool readable only by its recipient; the Investor view decrypts it locally. When an auditor asks, the holder picks one payment and generates a proof of that payment and nothing else — the circuit requires the note's spending key, so not even the issuer can produce it. The auditor verifies with no wallet, no storage and no privileged access, and each disclosed field is marked **proven** or **attested**, because a zero-knowledge proof and a claim are different objects.
 
 ## Layout
 
