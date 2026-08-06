@@ -371,6 +371,18 @@ select.ghost:focus { outline: none; border-color: var(--seal-dim); }
 
 input[type='radio'] { accent-color: var(--seal); }
 
+input.field {
+  width: 100%;
+  background: var(--ink);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--r);
+  color: var(--vellum);
+  font: 400 13px/1 var(--mono);
+  padding: 10px 13px;
+}
+input.field:focus { outline: none; border-color: var(--seal-dim); }
+input.field::placeholder { color: var(--vellum-faint); }
+
 /* ---------- progress: building → proving → submitting → confirmed ---------- */
 
 .progress {

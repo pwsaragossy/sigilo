@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sigilo Wallet — a confidential balance you can prove</title>
+<link rel="stylesheet" href="css/sigilo.css">
+
+<!--
+  Same import map as the demo page. The bare specifier is load-bearing: the SDK
+  resolves its own worker URLs from import.meta.url.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "stellar-private-payments": "../vendor/spp-sdk-web/js/index.js",
+    "@stellar/stellar-sdk": "./vendor/stellar-sdk.js"
+  }
+}
+</script>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Sigilo Wallet</h1>
+    <span class="tag">confidential balance · private send · proof of one payment · stellar testnet</span>
+  </div>
+
+  <!--
+    The demo cast, not an account manager. These are throwaway testnet keys the
+    seed produced; a real wallet holds one. Switching them here is what lets a
+    reader watch a payment leave one balance and arrive in another.
+  -->
+  <nav class="roles" aria-label="Wallet">
+    <select class="ghost" id="wallet-pick" aria-label="Open wallet"></select>
+  </nav>
+</header>
+
+<div class="banner" id="fatal" hidden></div>
+
+<main>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="panel">
+    <h2>Balance</h2>
+    <div class="split">
+      <div>
+        <p class="hint" style="margin:0 0 10px">What the ledger publishes</p>
+        <dl class="fields" id="wallet-public"></dl>
+      </div>
+      <div>
+        <p class="hint" style="margin:0 0 10px">What only this key opens</p>
+        <p style="font:400 42px/1 var(--serif); margin:0">
+          <span class="revealed" id="bal-private">—</span>
+          <span style="font-size:16px; color:var(--vellum-faint)">XLM</span>
+        </p>
+        <p class="hint" style="margin-top:10px" id="bal-note">
+          decrypted in this page, from note ciphertexts nobody else can read
+        </p>
+      </div>
+    </div>
+    <p class="progress" id="wallet-progress"></p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <div class="split">
+
+    <section class="panel">
+      <h2>Send, privately</h2>
+      <p class="hint" style="margin:0 0 16px">
+        The amount is a commitment. An observer sees an <code>invoke_host_function</code>
+        and two addresses — never a number.
+      </p>
+
+      <dl class="fields">
+        <dt>To</dt>
+        <dd><select class="ghost" id="send-to" style="width:100%"></select></dd>
+        <dt>or</dt>
+        <dd><input class="field" id="send-address" placeholder="any G… with registered payment keys"></dd>
+        <dt>Amount</dt>
+        <dd><input class="field" id="send-amount" type="number" min="0" step="0.0000001" placeholder="0.00"></dd>
+      </dl>
+
+      <button class="action" id="btn-send" style="margin-top:16px">Send</button>
+      <p class="progress" id="send-progress"></p>
+      <div id="send-out"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Withdraw</h2>
+      <p class="hint" style="margin:0 0 16px">
+        Leaves the pool for this wallet's public address. This is where the policy
+        gate is felt: a holder whose credential was revoked is refused here, over
+        coupons they already held.
+      </p>
+
+      <dl class="fields">
+        <dt>Amount</dt>
+        <dd><input class="field" id="wd-amount" type="number" min="0" step="0.0000001" placeholder="0.00"></dd>
+      </dl>
+
+      <button class="action" id="btn-withdraw" style="margin-top:16px">Withdraw</button>
+      <p class="progress" id="wd-progress"></p>
+      <div id="wd-out"></div>
+    </section>
+
+  </div>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="panel">
+    <h2>Receive</h2>
+    <div class="split">
+      <div>
+        <p class="hint" style="margin:0 0 12px">
+          Anyone paying this wallet resolves these two keys first. They are public —
+          publishing them reveals no balance and no history.
+        </p>
+        <dl class="fields" id="recv-keys"></dl>
+      </div>
+      <div>
+        <p class="hint" style="margin:0 0 12px">
+          Or shield your own funds: a deposit moves public XLM into the pool, after
+          which its movements stop being readable.
+        </p>
+        <dl class="fields">
+          <dt>Amount</dt>
+          <dd><input class="field" id="dep-amount" type="number" min="0" step="0.0000001" placeholder="0.00"></dd>
+        </dl>
+        <button class="ghost" id="btn-deposit" style="margin-top:14px">Deposit into the pool</button>
+        <p class="progress" id="dep-progress"></p>
+        <div id="dep-out"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="panel">
+    <h2>Activity</h2>
+    <p class="hint" style="margin:0 0 16px">
+      Every payment this wallet can open. The list is reconstructed locally by trial
+      decryption — the pool itself does not know which of these notes are yours.
+    </p>
+    <div id="activity"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="panel">
+    <h2>Prove one payment</h2>
+    <p class="hint" style="margin:0 0 16px">
+      The problem every confidential balance creates: if nothing is readable, nothing
+      can be shown to an accountant, a counterparty or a regulator. Pick one payment.
+      What leaves this wallet proves that payment and discloses nothing else — not the
+      balance, not the other notes, not who else was paid.
+    </p>
+
+    <div id="disclose-notes"></div>
+    <button class="action" id="btn-disclose" style="margin-top:14px" disabled>Generate the receipt</button>
+    <p class="progress" id="disclose-progress"></p>
+    <div id="disclose-out"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="panel">
+    <h2>Verify it — no wallet required</h2>
+    <p class="hint" style="margin:0 0 16px">
+      This panel holds no keys, opens no storage and has no account. It takes a receipt
+      and an RPC URL, and answers. That is what makes a disclosure worth giving: the
+      recipient needs nothing from you afterwards.
+    </p>
+
+    <textarea id="receipt-input" placeholder="paste a receipt"></textarea>
+    <div style="display:flex; gap:10px; margin-top:12px">
+      <button class="action" id="btn-verify">Verify</button>
+      <button class="ghost danger" id="btn-tamper">Alter the claimed amount</button>
+    </div>
+    <p class="progress" id="verify-progress"></p>
+    <div id="verify-out" style="margin-top:14px"></div>
+  </section>
+
+  <p class="hint" style="margin:26px 0 40px">
+    One wallet page, one exclusive local database — close the
+    <a href="index.html">issuer / investor / auditor demo</a> before opening this, or the
+    second tab evicts the first. Proving is real work: ~9–13 s of Groth16 per operation,
+    in a worker, not simulated.
+  </p>
+
+</main>
+
+<script type="module" src="js/wallet.js"></script>
+</body>
+</html>
