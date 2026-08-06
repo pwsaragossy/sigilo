@@ -44,9 +44,13 @@ ADMIN_KEY=$(printf '{"vec":[{"symbol":"Admin"}]}' | stellar xdr encode --type Sc
 # The trailing `|| true` is load-bearing: under `pipefail` a grep that matches
 # nothing fails the pipeline, and the caller's `current=$(tree_admin …)` would
 # then abort the script through `set -e` before it could say why.
-tree_admin() {  # tree_admin <tree_id> → C… , or empty if unreadable
+# `[CG]`, not `C`: before the handover the admin is the operator's *account*
+# (G…), and only afterwards a contract (C…). Matching contracts alone made this
+# return empty on a freshly deployed tree, which the caller then reported as
+# "cannot read the admin" — right refusal, wrong reason.
+tree_admin() {  # tree_admin <tree_id> → C… / G… , or empty if unreadable
   stellar contract read "${NET[@]}" --id "$1" --durability persistent \
-    --key-xdr "$ADMIN_KEY" 2>/dev/null | grep -oE 'C[A-Z0-9]{55}' | head -1 || true
+    --key-xdr "$ADMIN_KEY" 2>/dev/null | grep -oE '[CG][A-Z0-9]{55}' | head -1 || true
 }
 
 # Checked before anything is deployed, because handing the trees over is the only
