@@ -46,6 +46,37 @@ Every one of these is a public testnet transaction.
 
 The fifth row is the one to open. It is a successful withdrawal by a holder whose credential had already been revoked — the gap the policy gate closes. After syncing, the same withdrawal is refused.
 
+### The wallet's own run, with hashes
+
+Driven entirely through [`app/wallet.html`](app/wallet.html) as `inv2`, with the private balance read before and after each step. These are separate transactions from the coupon cycle above.
+
+| Step | `#bal-private` | Transaction |
+|---|---|---|
+| Deposit 10 XLM into the pool | 387.2291667 → 397.2291667 | [`887123c…`](https://stellar.expert/explorer/testnet/tx/887123c358c9e0e6c7edd1dfd5ed4aff6216143fc1dcea30db3adbde57edae79) |
+| **Private send, 3 XLM to `inv5`** | 397.2291667 → 394.2291667 | [`6443916…`](https://stellar.expert/explorer/testnet/tx/6443916a4efd27590b1216a10d444261da792d01c196f68fef6d3b1279f7f80a) |
+| Withdraw 2 XLM to the public address | 394.2291667 → 392.2291667 | [`072394c…`](https://stellar.expert/explorer/testnet/tx/072394c8f7c6604ce26a07e8649155988583e05de24056fcd3fa816f8195588b) |
+
+All three return `"status":"SUCCESS"` from `getTransaction`. The middle row is the confidentiality claim, and it is checked rather than asserted — **on decoded XDR, because the amount is encoded as binary and grepping the base64 response for a decimal figure passes on every transaction ever made.** Decoding envelope and result meta and searching for the literal stroop value:
+
+| Transaction | amount in stroops | occurrences in decoded XDR |
+|---|---|---|
+| Deposit | 100000000 | **11** — envelope 5, meta 6 |
+| **Private send** | 30000000 | **0** — envelope 0, meta 0 |
+| Withdraw | 20000000 | **6** — envelope 2, meta 4 |
+
+The deposit and the withdrawal are the control: value crossing the pool boundary is public by construction, and the same method finds it every time. The transfer's zero is therefore a result and not a broken search. That transaction carries the full confidential machinery — `new_commitment` ×4, `new_nullifier` ×4, `encrypted_output` ×6 — and has no `amount` field anywhere in its envelope. `inv5` opens it as `3.00` in their own wallet, from the note ciphertext, with their own key.
+
+Reproduce any row:
+
+```bash
+curl -s -X POST https://soroban-testnet.stellar.org -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"getTransaction","params":{"hash":"<HASH>"}}' \
+| jq -r '.result.envelopeXdr' | stellar xdr decode --type TransactionEnvelope --output json \
+| grep -c 30000000        # → 0 for the send, non-zero for deposit and withdrawal
+```
+
+**What this run does not contain, and why.** The fourth step — revoke the credential, sync, and watch the withdrawal be refused in the wallet — was not recorded. The bridge deployed at `CCCVU6BZ…` predates the binding fix and still exposes `grant(holder, leaf)` / `revoke(holder, note_key)`, while [`scripts/policy-bridge.sh`](scripts/policy-bridge.sh) now calls the fixed signatures, so `sync` cannot drive that deployment. Producing it means redeploying the association trees, which mints new note keys for every holder and orphans the contract ids the table above narrates. The refusal itself is demonstrated in the coupon-cycle run — rows four and five — and that path runs through the pool's association-set check, not the bridge, so a screenshot of it would look identical before and after the fix and would not be evidence of the fix regardless.
+
 Full sequence and enforcement semantics: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#reference-run). Step-by-step walkthrough: [docs/DEMO.md](docs/DEMO.md).
 
 ## The wallet
@@ -64,7 +95,7 @@ The demo's Investor tab shows the same balance from inside the issuer's story. T
 
 **The enrolment is checkable by the person it was done to.** The wallet re-derives the allow-list leaf standing in the holder's name from their own key and compares it, which is what turns [the leaf trade-off](#the-trade-offs-behind-those-rows) into something detectable rather than something to be told. The secret behind it never reaches the page and the issuer never holds it, so a match means nobody enrolled a stranger in their place. It lives here and nowhere else — a check on your own key belongs on your own page, and one copy cannot drift from another.
 
-**What the wallet is not.** It opens the five seeded holders from throwaway keys, not an account you own; a real one holds a single key and asks a browser extension for it. Send, deposit and withdraw invoke the pool's own calls and are not part of the recorded reference run above — that run demonstrates the coupon cycle, the freeze and the disclosure. Proving is real work: roughly 9–13 s of Groth16 per operation, in a worker, and the page says so rather than looking hung.
+**What the wallet is not.** It opens the five seeded holders from throwaway keys, not an account you own; a real one holds a single key and asks a browser extension for it. Deposit, private send and withdrawal are now recorded on testnet with published hashes — [the wallet's own run](#the-wallets-own-run-with-hashes) — but the policy-gated *refusal* is not, for the reason given there. Proving is real work: roughly 9–13 s of Groth16 per operation, in a worker, and the page says so rather than looking hung.
 
 ## Verify this yourself
 

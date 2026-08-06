@@ -268,6 +268,28 @@ The full cycle, executed against the deployment above. Every hash is public.
 
 The amounts above appear in this table because we chose to publish them. They are not readable from the pool transactions themselves.
 
+### The wallet's own run
+
+Driven through [`app/wallet.html`](../app/wallet.html) as `inv2`, separate from the coupon cycle above. The private balance is read from the page before and after each step; every hash returns `"status":"SUCCESS"`.
+
+| Step | `#bal-private` | Transaction |
+|---|---|---|
+| Deposit 10 XLM | 387.2291667 → 397.2291667 | [`887123c…`](https://stellar.expert/explorer/testnet/tx/887123c358c9e0e6c7edd1dfd5ed4aff6216143fc1dcea30db3adbde57edae79) |
+| **Private send, 3 XLM to `inv5`** | 397.2291667 → 394.2291667 | [`6443916…`](https://stellar.expert/explorer/testnet/tx/6443916a4efd27590b1216a10d444261da792d01c196f68fef6d3b1279f7f80a) |
+| Withdraw 2 XLM | 394.2291667 → 392.2291667 | [`072394c…`](https://stellar.expert/explorer/testnet/tx/072394c8f7c6604ce26a07e8649155988583e05de24056fcd3fa816f8195588b) |
+
+The confidentiality check runs on **decoded** XDR. Encoded integers are binary, so searching the base64 response for a decimal figure succeeds on every transaction ever made and proves nothing — that check would have been a rubber stamp. Decoding envelope and result meta and counting the literal stroop value:
+
+| Transaction | stroops | occurrences |
+|---|---|---|
+| Deposit | 100000000 | 11 |
+| **Private send** | 30000000 | **0** |
+| Withdraw | 20000000 | 6 |
+
+Deposit and withdrawal are the positive control — value crossing the pool boundary is public by construction, and the identical method finds it both times. The transfer's zero is therefore a measurement rather than a failed search. That transaction carries `new_commitment` ×4, `new_nullifier` ×4 and `encrypted_output` ×6, and exposes no `amount` field in its envelope; `inv5` reads it as `3.00` locally from the note ciphertext.
+
+**Not recorded:** the revoke → sync → refused-withdrawal step. The bridge at `CCCVU6BZ…` predates the binding fix and exposes the old `revoke(holder, note_key)` arity, so `scripts/policy-bridge.sh sync` cannot drive it. That refusal is already published in the coupon-cycle run above, and it is enforced by the pool's association-set check rather than by the bridge — so it would look the same before and after the fix either way.
+
 Proving takes roughly 9 s of CPU per operation. The revocation block surfaces client-side, when the wallet assembles its proof context — the association-set check fails before a transaction is ever built.
 
 ## Using it in your own deployment
