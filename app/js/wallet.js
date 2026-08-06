@@ -40,7 +40,7 @@ function die(error) {
   // No wallet means no pool. Left live, these answer a click with a null dereference,
   // which reads as broken code rather than as the one condition the banner just named.
   // The verify panel is deliberately not among them — it never opened storage.
-  for (const id of ['btn-send', 'btn-withdraw', 'btn-deposit', 'btn-disclose']) {
+  for (const id of ['btn-send', 'btn-withdraw', 'btn-deposit', 'btn-disclose', 'btn-derive']) {
     el(id).disabled = true;
   }
 
@@ -85,6 +85,77 @@ function renderActivity(notes) {
         </tr>`).join('')}
       </tbody>
     </table>`;
+}
+
+// The CLI records the leaf in decimal, the SDK answers in hex. Comparing as
+// numbers is correct — but showing them in different bases would put two
+// unlike strings under a "matches" badge, which reads as a contradiction.
+const asBigInt = (v) => BigInt(/^0x/i.test(String(v)) ? String(v) : String(v).trim());
+const asHex = (v) => `0x${asBigInt(v).toString(16).padStart(64, '0')}`;
+
+/**
+ * What the policy operator was given, and what this wallet can check.
+ *
+ * The note key is public. The membership secret behind the leaf is not — it is
+ * derived from this holder's key and the page never sees it, which is the point:
+ * only their wallet can reproduce the leaf enrolled on their behalf.
+ */
+function renderEnrolment(holder) {
+  el('derive-out').innerHTML = '';
+  el('derive-progress').textContent = '';
+  el('btn-derive').disabled = !holder.enrolledLeaf;
+
+  el('enrol-fields').innerHTML = `
+    <dt>Note key</dt>
+    <dd class="mono-sm">${holder.noteKey ?? '—'} <span class="badge public">public</span></dd>
+
+    <dt>Membership secret</dt>
+    <dd class="hint">held by this wallet — never sent to the page, never held by the issuer</dd>
+
+    <dt>Leaf on record</dt>
+    <dd class="mono-sm">${holder.enrolledLeaf
+      ? short(asHex(holder.enrolledLeaf), 14, 10)
+      : 'not enrolled yet'}<div class="hint">what the policy gate inserted under this name</div></dd>
+  `;
+}
+
+/** Re-derives the allow-list leaf from this wallet's own keys, and compares. */
+async function deriveLeaf() {
+  const holder = current?.holder;
+  if (!holder?.enrolledLeaf) return;
+
+  el('btn-derive').disabled = true;
+  el('derive-progress').textContent = 'deriving from this wallet…';
+
+  try {
+    // The account owns the secret; the page only ever sees the resulting leaf.
+    const derived = await current.account.deriveAspUserLeaf();
+    const match = asBigInt(derived) === asBigInt(holder.enrolledLeaf);
+
+    el('derive-out').innerHTML = `
+      <dl class="fields">
+        <dt>Derived here</dt>
+        <dd class="mono-sm ${match ? 'revealed' : ''}">${short(asHex(derived), 14, 10)}</dd>
+        <dt>Verdict</dt>
+        <dd>${match
+          ? '<span class="badge ok">matches the leaf on record</span>'
+          : '<span class="badge bad">does not match</span>'}</dd>
+      </dl>
+      <p class="hint" style="margin-top:12px">${match
+        ? `The enrolment standing in the allow-list under ${holder.name} was derived from
+           this wallet's own key. Nobody could have enrolled a stranger in their place without
+           this check failing. It does not claim the allow-list holds nothing else — the policy
+           gate's guarantee is that no leaf is inserted for an address the identity register refuses.`
+        : `The leaf on record was not derived from this wallet's key. Either the wallet is
+           opened on different keys than the ones enrolled, or the enrolment does not belong
+           to this holder — the check exists so the difference is visible.`}</p>`;
+    el('derive-progress').textContent = '';
+  } catch (error) {
+    el('derive-progress').textContent = `failed: ${error?.message ?? error}`;
+    console.error(error);
+  } finally {
+    el('btn-derive').disabled = false;
+  }
 }
 
 function renderNoteChoices(notes) {
@@ -311,6 +382,7 @@ async function openWallet(name) {
   selectedNote = null;
 
   renderPublic(holder);
+  renderEnrolment(holder);
   el('bal-private').textContent = '—';
   el('activity').innerHTML = '<p class="hint">Opening wallet…</p>';
   setProgress('wallet-progress', 'deriving keys and syncing notes…', 'opening');
@@ -350,6 +422,7 @@ async function start() {
     el('btn-withdraw').addEventListener('click', withdraw);
     el('btn-deposit').addEventListener('click', deposit);
     el('btn-disclose').addEventListener('click', generateReceipt);
+    el('btn-derive').addEventListener('click', deriveLeaf);
 
     await initRuntime(RPC_URL);
     await openWallet(demo.holders[0].name);

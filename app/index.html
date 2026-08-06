@@ -180,26 +180,10 @@
     </div>
 
     <!--
-      Enrolment, from the holder's side. The membership secret is derived from
-      this holder's own key and the page never sees it — only their wallet can
-      re-derive the leaf. Which makes enrolment checkable by the person it was
-      done to, rather than something they are told about.
+      The enrolment check moved to app/wallet.html. It is an action a holder takes on
+      their own key, so it belongs on the holder's own page rather than in a tab of the
+      issuer's story — and keeping one copy means it cannot drift between the two.
     -->
-    <div class="panel">
-      <h2>Enrolment — the key that stays yours</h2>
-      <p class="hint">
-        Spending inside the confidential pool means proving membership in the allow-list,
-        and that proof is built from a secret only this holder's key can derive. The issuer
-        never holds it. So enrolment is something the holder <em>consents to</em> — and it is
-        checkable: the leaf the policy gate enrolled should be the one this wallet derives.
-      </p>
-      <dl class="fields" id="enrol-fields" style="margin-top:16px"></dl>
-      <div style="margin-top:16px; display:flex; gap:10px; align-items:center">
-        <button class="ghost" id="btn-derive">Derive it in this wallet</button>
-        <span class="progress" id="derive-progress" aria-live="polite"></span>
-      </div>
-      <div id="derive-out" style="margin-top:14px"></div>
-    </div>
 
     <div class="panel">
       <h2>Selective disclosure</h2>
