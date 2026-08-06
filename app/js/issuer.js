@@ -297,6 +297,25 @@ async function issueTokens() {
  * the money leaves. After syncing the same attempt is refused. Two clicks, and the
  * argument needs no explaining.
  */
+const escapeHtml = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+/**
+ * A refusal, captioned only when the rail actually refused.
+ *
+ * Every failure here arrives the same way — the association-set check, a prover
+ * timeout, a flat RPC. Captioning all of them as the freeze claims an enforcement
+ * that did not happen, which in this panel is the one lie that would cost the
+ * whole argument: the point of "Prove it" is that the holder is *not* frozen yet.
+ */
+function refusal(message) {
+  const frozen = /non-membership|association|not in the allow|asp/i.test(message);
+  return `
+    <p class="hint"><span class="badge ${frozen ? 'ok' : 'bad'}">refused</span> ${escapeHtml(message)}</p>
+    <p class="hint" style="margin-top:8px">${frozen
+      ? 'This is the policy gate. The freeze reaches back over coupons received before the revocation.'
+      : 'Not a policy refusal — the attempt failed before the rail answered. Try again; the gap is still open.'}</p>`;
+}
+
 async function proveTheGap() {
   const name = el('btn-prove').dataset.holder;
   const holder = demo.holders.find((h) => h.name === name);
@@ -327,25 +346,19 @@ async function proveTheGap() {
       ? `<p style="font:400 19px/1.3 var(--serif); color:var(--refused); margin:0 0 8px">
            ${name} just took the money out.</p>
          <p class="hint">Revoked in the register, never told to the payment side. Sync and try again.</p>`
-      : `<p class="hint"><span class="badge ok">refused</span> ${outcome.message}</p>
-         <p class="hint" style="margin-top:8px">The freeze reaches back over coupons
-           received before the revocation.</p>`;
+      : refusal(outcome.message);
 
     setProgress('sync-progress', '');
   } catch (error) {
-    // A refusal arrives as a thrown error on the client, before a transaction exists.
-    const message = String(error?.message ?? error);
-    el('prove-out').innerHTML = `
-      <p class="hint"><span class="badge ok">refused</span> ${message.split('\n')[0]}</p>
-      <p class="hint" style="margin-top:8px">The freeze reaches back over coupons
-        received before the revocation.</p>`;
+    // A policy refusal arrives as a thrown error on the client, before a transaction
+    // exists — but so does a timeout, an RPC hiccup and an empty balance. They are
+    // rendered by the same branch, which is why the caption has to be earned.
+    el('prove-out').innerHTML = refusal(String(error?.message ?? error).split('\n')[0]);
     setProgress('sync-progress', '');
   } finally {
     el('btn-prove').disabled = false;
   }
 }
-
-const escapeHtml = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
 /**
  * Attempts the forbidden write, live — the one claim that is not self-attested.

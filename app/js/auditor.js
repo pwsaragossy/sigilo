@@ -77,7 +77,10 @@ function renderReport(receipt, report) {
 
 async function verify() {
   const raw = el('receipt-input').value.trim();
-  if (!raw) return;
+  if (!raw) {
+    el('verify-progress').textContent = 'paste a receipt first';
+    return;
+  }
 
   // Clear the previous verdict first. Verification takes ~10s, and leaving the
   // last answer on screen while a new receipt is checked reads as approval.
@@ -85,8 +88,22 @@ async function verify() {
   el('verify-progress').textContent = 'verifying — ~13s of real cryptography…';
   el('btn-verify').disabled = true;
 
+  let receipt;
   try {
-    const receipt = JSON.parse(raw);
+    receipt = JSON.parse(raw);
+  } catch {
+    // Not a verdict: nothing was checked. Captioning malformed JSON as "altered, or
+    // describing a payment this pool never saw" claims a cryptographic finding the
+    // verifier never got far enough to make.
+    el('verify-out').innerHTML = `
+      <p style="font: 400 22px/1.2 var(--serif); margin:0 0 14px; color:var(--vellum-dim)">Not a receipt</p>
+      <p class="hint">This is not valid JSON, so there was nothing to check. Paste the
+        receipt exactly as the holder produced it.</p>`;
+    el('verify-progress').textContent = '';
+    return;
+  }
+
+  try {
     // Checked against our own copy of the key, never the one the receipt names.
     const expected = expectedVkHash(receipt.circuit?.name);
 

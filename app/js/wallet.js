@@ -162,22 +162,25 @@ function renderNoteChoices(notes) {
   selectedNote = null;
   el('btn-disclose').disabled = true;
 
-  const spendable = notes.filter((n) => !n.spent);
-  if (!spendable.length) {
-    el('disclose-notes').innerHTML = '<p class="hint">No payment held right now to disclose.</p>';
+  if (!notes.length) {
+    el('disclose-notes').innerHTML = '<p class="hint">No payment to disclose yet.</p>';
     return;
   }
 
-  el('disclose-notes').innerHTML = spendable.map((n, i) => `
+  // Spent notes stay selectable. Disclosing a payment already spent is legitimate —
+  // it is why the auditor reports Unspent as a separate fact rather than as validity —
+  // and hiding them here contradicted that panel two sections down.
+  el('disclose-notes').innerHTML = notes.map((n, i) => `
     <label style="display:flex; gap:10px; align-items:center; padding:7px 0">
       <input type="radio" name="note" value="${i}">
       <span class="mono-sm">${short(n.id, 12, 8)}</span>
       <span class="revealed">${fmt(fromStroops(n.amount))} XLM</span>
+      ${n.spent ? '<span class="badge public">spent</span>' : ''}
     </label>`).join('');
 
   el('disclose-notes').querySelectorAll('input[name=note]').forEach((input) => {
     input.addEventListener('change', () => {
-      selectedNote = spendable[Number(input.value)];
+      selectedNote = notes[Number(input.value)];
       el('btn-disclose').disabled = false;
     });
   });
@@ -230,7 +233,7 @@ async function act({ button, progressId, outId, flow, label, run }) {
            ${outcome.hashes.map((h) =>
              `<a href="${txUrl(h)}" target="_blank" rel="noopener">${short(h, 8, 6)}</a>`).join(' ')}
          </p>`
-      : `<p class="hint"><span class="badge bad">refused</span> ${outcome.message}</p>`;
+      : `<p class="hint"><span class="badge bad">refused</span> ${explainRefusal(outcome.message)}</p>`;
 
     setProgress(progressId, '');
     if (outcome.ok) await refresh();
@@ -246,7 +249,7 @@ async function act({ button, progressId, outId, flow, label, run }) {
     const frozen = /non-membership|association|not in the allow|asp/i.test(message);
 
     el(outId).innerHTML = `
-      <p class="hint"><span class="badge bad">refused</span> ${message}</p>
+      <p class="hint"><span class="badge bad">refused</span> ${explainRefusal(message)}</p>
       ${frozen ? `<p class="hint" style="margin-top:8px">This is the policy gate. The freeze
         reaches back over payments received before the credential was revoked.</p>` : ''}`;
     setProgress(progressId, '');
@@ -257,11 +260,25 @@ async function act({ button, progressId, outId, flow, label, run }) {
   }
 }
 
+/**
+ * Validates the stroop value, not the decimal one.
+ *
+ * `0.00000001` is above zero and rounds to zero stroops, so checking the decimal
+ * let it through to the pool, which answered with its own lower-level complaint.
+ * The smallest thing this rail can move is one stroop; say so here.
+ */
 function amountOf(id) {
   const value = Number(el(id).value);
   if (!Number.isFinite(value) || value <= 0) throw new Error('Enter an amount above zero.');
-  return toStroops(value);
+  const stroops = toStroops(value);
+  if (stroops <= 0n) throw new Error('Too small to move — one stroop (0.0000001 XLM) is the minimum.');
+  return stroops;
 }
+
+/** The pool refuses a single deposit above roughly 100 XLM; #6 is how it says so. */
+const explainRefusal = (message) => /Error\(Contract, #6\)/.test(message)
+  ? `${message} — the pool caps a single deposit; amounts above ~100 XLM are refused.`
+  : message;
 
 async function send() {
   const typed = el('send-address').value.trim();
@@ -376,6 +393,20 @@ async function refresh() {
   renderNoteChoices(notes);
 }
 
+/**
+ * Locks the actions while there is no wallet behind them.
+ *
+ * Between `current = null` and the account opening there is a live window — a
+ * cold start makes it seconds long — where every button is clickable and every
+ * handler dereferences null. Derive was the visible symptom: it answered a click
+ * with silence, which reads as a dead button rather than as "not ready yet".
+ */
+function lockActions(locked) {
+  for (const id of ['btn-send', 'btn-withdraw', 'btn-deposit', 'btn-derive', 'btn-disclose']) {
+    el(id).disabled = locked;
+  }
+}
+
 async function openWallet(name) {
   const holder = demo.holders.find((h) => h.name === name);
   current = null;
@@ -383,6 +414,7 @@ async function openWallet(name) {
 
   renderPublic(holder);
   renderEnrolment(holder);
+  lockActions(true);          // after renderEnrolment, which re-enables Derive
   el('bal-private').textContent = '—';
   el('activity').innerHTML = '<p class="hint">Opening wallet…</p>';
   setProgress('wallet-progress', 'deriving keys and syncing notes…', 'opening');
@@ -399,10 +431,17 @@ async function openWallet(name) {
     .join('');
 
   await Promise.all([refresh(), renderReceiveKeys(holder.address)]);
+  // renderNoteChoices, inside refresh(), owns btn-disclose from here on.
+  lockActions(false);
+  el('btn-derive').disabled = !holder.enrolledLeaf;
+  if (!selectedNote) el('btn-disclose').disabled = true;
   setProgress('wallet-progress', '');
 }
 
 async function start() {
+  // The runtime takes seconds to come up on a cold start; nothing is clickable
+  // until there is a wallet behind it.
+  lockActions(true);
   try {
     demo = await loadDemoState();
 
