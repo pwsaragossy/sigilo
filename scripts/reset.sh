@@ -148,8 +148,9 @@ cat <<'NEXT'
 
   One thing this script cannot do: the browser keeps its own copy of note state
   in OPFS, and a stale copy will show a balance that was just swept away. Before
-  the next take, clear site data for localhost:8080 (DevTools → Application →
-  Storage → Clear site data) and reload.
+  the next take, click "Reset demo cache" at the bottom of either page — it drops
+  that copy and reloads. (DevTools → Application → Storage → Clear site data does
+  the same thing by hand.)
 
   That clears the stale balance, not the history: note state is rebuilt from the
   chain, so earlier coupons come back marked spent. Sweeping spends them, and
