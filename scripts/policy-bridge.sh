@@ -136,6 +136,23 @@ is_blocklisted() {  # is_blocklisted <note_key_decimal>
   [[ "$found" == *'"found":true'* || "$found" == *"Found"* ]]
 }
 
+# Does the bridge hold an enrolment for this holder?
+#
+# Asked of the chain, never of policy.json. The local `allowlisted` flag outlives
+# a redeploy and the contract's storage does not, so a fresh bridge starts with no
+# enrolments while every holder still reads as allowlisted locally. Gating the
+# grant on the flag would then skip the one call that writes the binding, and
+# every later freeze would fail with NotEnrolled (#4) against a bridge that had
+# never heard of the holder. The flag is a display cache; this is the truth.
+#
+# A transient RPC failure answers "no" here, which costs a redundant grant — and
+# re-granting the same pair is defined to be harmless, so that is the safe way to
+# be wrong.
+is_enrolled() {  # is_enrolled <holder_address>
+  stellar contract invoke "${NET[@]}" --id "$BRIDGE" --source "$ADMIN" --send=no \
+    -- enrolment --holder "$1" >/dev/null 2>&1
+}
+
 policy_get() { jq -r --arg k "$1" --arg f "$2" '.[$k][$f] // empty' "$POLICY_STATE"; }
 policy_set() {  # policy_set <holder> <field> <value>
   local tmp; tmp=$(mktemp)
@@ -205,22 +222,28 @@ cmd_sync() {
     fi
 
     if [[ "$state" == yes ]]; then
-      # Credential is valid: ensure allowlisted, and lift any freeze.
-      if [[ "$(policy_get "$name" allowlisted)" != "true" ]]; then
-        # The allowlist tree is append-only and offers no membership query, so a
-        # re-insert is the only way to find out it was already there. Treat that
-        # as success: the invariant we want is "leaf is present", not "we put it
-        # there this run".
-        if bridge_call grant --holder "$holder" --leaf "$leaf"; then
-          echo "  $name: credential valid → added to allowlist"
+      # Credential is valid: ensure enrolled, and lift any freeze.
+      #
+      # `grant` records the leaf *and* the note key, and that binding is what
+      # `revoke` later acts on — so this is no longer only "put the leaf in the
+      # tree", it is the step that decides which key a freeze may ever touch.
+      if ! is_enrolled "$holder"; then
+        if bridge_call grant --holder "$holder" --leaf "$leaf" --note_key "$note_dec"; then
+          policy_set "$name" allowlisted true
+          echo "  $name: credential valid → enrolled, added to allowlist"
+          changes=$((changes + 1))
         else
-          echo "  $name: credential valid → already in allowlist"
+          # Previously any failure here was reported as "already in allowlist",
+          # which turned an RPC blip into a false record of success.
+          policy_set "$name" allowlisted false
+          echo "  $name: FAILED to enrol — $BRIDGE_ERR"
+          failures=$((failures + 1))
         fi
+      elif [[ "$(policy_get "$name" allowlisted)" != "true" ]]; then
         policy_set "$name" allowlisted true
-        changes=$((changes + 1))
       fi
       if is_blocklisted "$note_dec"; then
-        if bridge_call restore --holder "$holder" --note_key "$note_dec"; then
+        if bridge_call restore --holder "$holder"; then
           policy_set "$name" blocked false
           echo "  $name: credential restored → unfrozen"
           changes=$((changes + 1))
@@ -234,7 +257,7 @@ cmd_sync() {
       # blocklist is the only lever — and it is the stronger one, since the pool
       # rejects proofs against a stale root.
       if ! is_blocklisted "$note_dec"; then
-        if bridge_call revoke --holder "$holder" --note_key "$note_dec"; then
+        if bridge_call revoke --holder "$holder"; then
           policy_set "$name" blocked true
           echo "  $name: credential absent → blocklisted (pool balance frozen)"
           changes=$((changes + 1))
@@ -263,14 +286,20 @@ cmd_sync() {
 
 cmd_status() {
   step "policy state"
-  printf '  %-6s %-12s %-11s %s\n' HOLDER CREDENTIAL ALLOWLIST BLOCKLIST
+  printf '  %-6s %-12s %-11s %s\n' HOLDER CREDENTIAL ENROLLED BLOCKLIST
   for name in $(jq -r '.holders[].name' "$RWA_STATE"); do
-    local cred block="no"
+    # Every column is read from the chain. The one that used to come from
+    # policy.json reported holders as enrolled on a bridge that had never
+    # heard of them, because the local flag outlives the contract's storage.
+    # `true`/`false` rather than yes/no: app/server.mjs parses this column with
+    # a fixed regex, and this is the shape it already expected.
+    local cred block="no" enrolled="false" holder
+    holder=$(jq -r --arg n "$name" '.holders[]|select(.name==$n)|.address' "$RWA_STATE")
     cred=$(credential_state "sigilo-$name")
     [[ "$cred" == unreachable ]] && cred="?"
+    is_enrolled "$holder" && enrolled="true"
     is_blocklisted "$(note_key_decimal "$(policy_get "$name" note_key)")" && block="yes"
-    printf '  %-6s %-12s %-11s %s\n' "$name" "$cred" \
-      "$(policy_get "$name" allowlisted)" "$block"
+    printf '  %-6s %-12s %-11s %s\n' "$name" "$cred" "$enrolled" "$block"
   done
   echo
   echo "  pool: $POOL"
