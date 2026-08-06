@@ -11,7 +11,7 @@
 // verification needs nothing from the wallet.
 
 import {
-  loadDemoState, NETWORK_PASSPHRASE, RPC_URL, COUPON,
+  loadDemoState, fetchLiveState, NETWORK_PASSPHRASE, RPC_URL, COUPON,
   fromStroops, toStroops, fmt, short, contractUrl, txUrl,
 } from './demo-state.js';
 import {
@@ -55,9 +55,11 @@ function renderPublic(holder) {
     <dt>Token</dt>
     <dd><a href="${contractUrl(demo.token.contract)}" target="_blank" rel="noopener">${demo.token.symbol}</a></dd>
     <dt>Position</dt><dd>${fmt(holder.position, 0)} <span class="badge public">public</span></dd>
-    <dt>Credential</dt><dd>${holder.credentialValid
-      ? '<span class="badge ok">valid</span>'
-      : '<span class="badge bad">revoked</span>'}</dd>
+    <dt>Credential</dt><dd>${holder.credentialValid === null
+      ? '<span class="badge public">checking…</span>'
+      : (holder.credentialValid
+        ? '<span class="badge ok">valid</span>'
+        : '<span class="badge bad">revoked</span>')}</dd>
     <dt>Pool</dt>
     <dd class="mono-sm"><a href="${contractUrl(demo.rail.pool)}" target="_blank" rel="noopener">${short(demo.rail.pool, 8, 6)}</a></dd>
     <dt>Coupon</dt>
@@ -462,6 +464,13 @@ async function start() {
     el('btn-deposit').addEventListener('click', deposit);
     el('btn-disclose').addEventListener('click', generateReceipt);
     el('btn-derive').addEventListener('click', deriveLeaf);
+
+    // The register is read in the background: this page never asked before, so a
+    // holder revoked elsewhere kept reading "valid" here for the whole session.
+    // Slow enough to not block the wallet, so it repaints when it lands.
+    fetchLiveState(demo).then((live) => {
+      if (live && current) renderPublic(current.holder);
+    });
 
     await initRuntime(RPC_URL);
     await openWallet(demo.holders[0].name);

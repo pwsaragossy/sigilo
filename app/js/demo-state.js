@@ -64,9 +64,11 @@ export async function loadDemoState() {
     holders: rwa.holders.map((h) => ({
       ...h,
       secret: keys[h.name]?.secret,
-      // `blocked` is only written once a holder has actually been blocked,
-      // so absent means "not blocked", not "unknown".
-      credentialValid: policy[h.name]?.blocked !== 'true',
+      // The credential lives in the identity register and nothing here has read it.
+      // It used to be inferred from `blocked`, which is the *rail's* verdict — so a
+      // holder revoked through the interface came back `valid` on the next reload,
+      // with no claim on-chain. null means unknown; only fetchLiveState() knows.
+      credentialValid: null,
       railBlocked: policy[h.name]?.blocked === 'true',
       allowlisted: policy[h.name]?.allowlisted === 'true',
       noteKey: policy[h.name]?.note_key,
@@ -78,6 +80,30 @@ export async function loadDemoState() {
   };
 
   return cache;
+}
+
+/**
+ * Reads both systems from the chain and merges them into the loaded state.
+ *
+ * The seed knows the deployment; only the chain knows who is credentialed right
+ * now. Every page that shows a credential has to ask, or it shows the state of
+ * whenever the seed was written. Returns whether the read succeeded — a caller
+ * that gets `false` still has `credentialValid: null` and must say so rather
+ * than pick a side.
+ */
+export async function fetchLiveState(state) {
+  try {
+    const res = await fetch('/api/status');
+    const out = await res.json();
+    if (!res.ok) return false;
+    for (const holder of state.holders) {
+      const live = out.holders?.[holder.name];
+      if (live) Object.assign(holder, live);
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

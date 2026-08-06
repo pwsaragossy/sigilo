@@ -6,7 +6,7 @@
 // holder can still spend — which is exactly what the bridge exists to close.
 
 import {
-  loadDemoState, NETWORK_PASSPHRASE, COUPON,
+  loadDemoState, fetchLiveState, NETWORK_PASSPHRASE, COUPON,
   accruedCoupon, toStroops, fromStroops, fmt, short, txUrl, contractUrl,
 } from './demo-state.js';
 import {
@@ -42,8 +42,21 @@ function renderSummary() {
     (<a href="${contractUrl(demo.rail.pool)}" target="_blank" rel="noopener">${short(demo.rail.pool, 8, 6)}</a>).`;
 }
 
-/** A holder is out of step when the register and the rail disagree about them. */
-const outOfStep = (h) => h.credentialValid === h.railBlocked;
+/**
+ * A holder is out of step when the register and the rail disagree about them.
+ *
+ * Unknown is not disagreement: until the register has actually been read, the
+ * honest answer is that we cannot tell, and claiming a gap we have not seen is
+ * the same error as claiming a freeze that did not happen.
+ */
+const outOfStep = (h) => h.credentialValid !== null && h.credentialValid === h.railBlocked;
+
+/** The register's verdict, or an admission that it has not been read. */
+const credentialBadge = (h) => h.credentialValid === null
+  ? '<span class="badge public">checking…</span>'
+  : (h.credentialValid
+    ? '<span class="badge ok">valid</span>'
+    : '<span class="badge bad">revoked</span>');
 
 /**
  * One row per holder, carrying both verdicts.
@@ -62,9 +75,7 @@ function renderHolders() {
       <td>${h.name}<div class="mono-sm">${short(h.address, 8, 6)}</div></td>
       <td class="num">${fmt(h.position, 0)}</td>
       <td>${h.entryDate}</td>
-      <td data-credential>${h.credentialValid
-        ? '<span class="badge ok">valid</span>'
-        : '<span class="badge bad">revoked</span>'}</td>
+      <td data-credential>${credentialBadge(h)}</td>
       <td class="link-cell" ${outOfStep(h) ? 'data-broken' : ''}>${outOfStep(h) ? '╳' : '───'}</td>
       <td data-spend>${h.railBlocked
         ? '<span class="badge bad">frozen</span>'
@@ -72,7 +83,8 @@ function renderHolders() {
         ${outOfStep(h) ? `<div class="mono-sm out-of-step">${h.credentialValid
           ? 'restored — but the rail still freezes them'
           : 'revoked — but the rail still lets them spend'}</div>` : ''}</td>
-      <td><button class="ghost" data-revoke="${h.name}">${h.credentialValid ? 'Revoke' : 'Restore'}</button></td>
+      <td><button class="ghost" data-revoke="${h.name}"
+            ${h.credentialValid === null ? 'disabled' : ''}>${h.credentialValid === false ? 'Restore' : 'Revoke'}</button></td>
     </tr>`).join('');
 
   el('issuer-holders').querySelectorAll('[data-revoke]').forEach((btn) => {
@@ -150,9 +162,11 @@ function renderCoupons() {
       <td class="num">${fmt(h.position, 0)}</td>
       <td class="num">${days}</td>
       <td class="num">${fmt(amount)}</td>
-      <td>${h.credentialValid
-        ? '<span class="badge public">due</span>'
-        : '<span class="badge bad">held back</span>'}</td>
+      <td>${h.credentialValid === null
+        ? '<span class="badge public">checking…</span>'
+        : (h.credentialValid
+          ? '<span class="badge public">due</span>'
+          : '<span class="badge bad">held back</span>')}</td>
     </tr>`;
   }).join('');
 }
@@ -233,7 +247,7 @@ async function syncPolicy() {
 
 function renderMintTargets() {
   el('mint-to').innerHTML = demo.holders
-    .map((h) => `<option value="${h.name}">${h.name}${h.credentialValid ? '' : ' — revoked'}</option>`)
+    .map((h) => `<option value="${h.name}">${h.name}${h.credentialValid === false ? ' — revoked' : ''}</option>`)
     .join('');
 }
 
@@ -410,7 +424,9 @@ async function payCycle() {
     // Eligibility follows the register: an uncredentialed holder is skipped by
     // the issuer's own policy. The rail would let the payment through — it only
     // gates spending — so this exclusion is a service decision, not enforcement.
-    const due = demo.holders.filter((h) => h.credentialValid);
+    // Strictly true: an unread register is not permission to pay.
+    const due = demo.holders.filter((h) => h.credentialValid === true);
+    if (!due.length) throw new Error('no holder is known to be credentialed — sync or reload first');
     let paid = 0;
 
     for (const holder of due) {
@@ -444,30 +460,7 @@ async function payCycle() {
   }
 }
 
-/**
- * Reads both systems from the chain rather than trusting local files, so a
- * divergence between the register and the rail shows up instead of being
- * papered over.
- *
- * Returns whether the read succeeded. The caller has to know: after a sync, a
- * failed read means the badges are stale seed values, and showing those as if
- * they were chain state is how a demo tells its audience the opposite of what
- * happened.
- */
-async function refreshPolicyState() {
-  try {
-    const res = await fetch('/api/status');
-    const out = await res.json();
-    if (!res.ok) return false;
-    for (const holder of demo.holders) {
-      const live = out.holders?.[holder.name];
-      if (live) Object.assign(holder, live);
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
+const refreshPolicyState = () => fetchLiveState(demo);
 
 export async function mountIssuer(state) {
   demo = state ?? (await loadDemoState());
@@ -478,11 +471,17 @@ export async function mountIssuer(state) {
 
   renderMintTargets();
 
-  await refreshPolicyState();
+  // Until this lands every credential reads "checking…". If it never lands, it
+  // keeps reading that — the seed cannot answer this question and must not try.
+  const live = await refreshPolicyState();
   renderHolders();
   renderBridge();
   renderCoupons();
   renderMintTargets();
+  if (!live) {
+    setProgress('sync-progress',
+      'could not read the identity register — credentials below are unknown, not valid. Is SPP_REPO set on the server?');
+  }
   el('btn-sync').addEventListener('click', syncPolicy);
   el('btn-pay').addEventListener('click', payCycle);
   el('btn-mint').addEventListener('click', issueTokens);

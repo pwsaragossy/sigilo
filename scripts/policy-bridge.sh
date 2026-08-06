@@ -78,9 +78,31 @@ note_key_decimal() {
 # every required claim from a trusted issuer, so simulating it is the question
 # "does this holder still hold a valid credential?".
 # ---------------------------------------------------------------------------
-is_credentialed() {  # is_credentialed <stellar account alias>
-  stellar contract invoke "${NET[@]}" --id "$VERIFIER" --source "$ADMIN" --send=no \
-    -- verify_identity --account "$1" >/dev/null 2>&1
+# Answers yes / no / unreachable, because those are three different things and
+# collapsing the last two is how a network blip became a revocation. A genuine
+# refusal traps with a typed contract error; a flat RPC says "client error" and
+# names no contract at all. Reading the second as "not credentialed" made status
+# report holders as revoked while their claims sat untouched on-chain — and, worse,
+# had sync propose a freeze against someone in good standing. The contract refuses
+# that (StillCredentialed), so nothing was ever mis-frozen; the report lied anyway.
+credential_state() {  # credential_state <alias> → yes | no | unreachable
+  local out attempt=1
+  while (( attempt <= 3 )); do
+    if out=$(stellar contract invoke "${NET[@]}" --id "$VERIFIER" --source "$ADMIN" --send=no \
+               -- verify_identity --account "$1" 2>&1); then
+      echo yes; return 0
+    fi
+    # A typed contract error is the register answering. Anything else is noise.
+    if grep -qE 'Error\(Contract, #[0-9]+\)' <<<"$out"; then
+      echo no; return 0
+    fi
+    attempt=$((attempt + 1))
+  done
+  echo unreachable
+}
+
+is_credentialed() {  # is_credentialed <alias> — true only on a definite yes
+  [[ "$(credential_state "$1")" == yes ]]
 }
 
 
@@ -172,7 +194,17 @@ cmd_sync() {
     local holder
     holder=$(jq -r --arg n "$name" '.holders[]|select(.name==$n)|.address' "$RWA_STATE")
 
-    if is_credentialed "$alias"; then
+    local state
+    state=$(credential_state "$alias")
+    if [[ "$state" == unreachable ]]; then
+      # Never propose a freeze on a register we could not reach. The contract
+      # would refuse it anyway; proposing it at all is the bug.
+      echo "  $name: SKIPPED — could not read the identity register"
+      failures=$((failures + 1))
+      continue
+    fi
+
+    if [[ "$state" == yes ]]; then
       # Credential is valid: ensure allowlisted, and lift any freeze.
       if [[ "$(policy_get "$name" allowlisted)" != "true" ]]; then
         # The allowlist tree is append-only and offers no membership query, so a
@@ -233,8 +265,9 @@ cmd_status() {
   step "policy state"
   printf '  %-6s %-12s %-11s %s\n' HOLDER CREDENTIAL ALLOWLIST BLOCKLIST
   for name in $(jq -r '.holders[].name' "$RWA_STATE"); do
-    local cred="no" block="no"
-    is_credentialed "sigilo-$name" && cred="yes"
+    local cred block="no"
+    cred=$(credential_state "sigilo-$name")
+    [[ "$cred" == unreachable ]] && cred="?"
     is_blocklisted "$(note_key_decimal "$(policy_get "$name" note_key)")" && block="yes"
     printf '  %-6s %-12s %-11s %s\n' "$name" "$cred" \
       "$(policy_get "$name" allowlisted)" "$block"

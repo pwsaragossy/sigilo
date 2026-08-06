@@ -33,9 +33,11 @@ function renderPublic(holder) {
     <dt>Token</dt><dd><a href="${contractUrl(demo.token.contract)}" target="_blank" rel="noopener">${demo.token.symbol}</a></dd>
     <dt>Position</dt><dd>${fmt(holder.position, 0)} <span class="badge public">public</span></dd>
     <dt>Entered</dt><dd>${holder.entryDate} <span class="badge public">public</span></dd>
-    <dt>Credential</dt><dd>${holder.credentialValid
-      ? '<span class="badge ok">valid</span>'
-      : '<span class="badge bad">revoked</span>'}</dd>
+    <dt>Credential</dt><dd>${holder.credentialValid === null
+      ? '<span class="badge public">checking…</span>'
+      : (holder.credentialValid
+        ? '<span class="badge ok">valid</span>'
+        : '<span class="badge bad">revoked</span>')}</dd>
     <dt>Coupon paid</dt><dd><span class="sealed">—————</span> <span class="hint">not readable on-chain</span></dd>
     <dt title="what an observer could still infer">Accrual</dt>
     <dd class="hint">${days} days at ${COUPON.annualRatePct}% — computable only if the rate is known</dd>

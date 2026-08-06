@@ -88,9 +88,11 @@ async function handleStatus(_req, res) {
     const { stdout } = await run(resolve(ROOT, 'scripts/policy-bridge.sh'), ['status'], { env });
     const holders = {};
     for (const line of stdout.split('\n')) {
-      const m = line.trim().match(/^(inv[1-9])\s+(yes|no)\s+(true|false)\s+(yes|no)$/);
+      // `?` is the register being unreachable, which is neither yes nor no. It
+      // travels as null so the interface can say "unknown" instead of picking.
+      const m = line.trim().match(/^(inv[1-9])\s+(yes|no|\?)\s+(true|false)\s+(yes|no)$/);
       if (m) holders[m[1]] = {
-        credentialValid: m[2] === 'yes',
+        credentialValid: m[2] === '?' ? null : m[2] === 'yes',
         allowlisted: m[3] === 'true',
         railBlocked: m[4] === 'yes',
       };
