@@ -74,6 +74,73 @@ function renderPrivate(notes) {
     </p>`;
 }
 
+/**
+ * What the policy operator was given, and what this holder can check.
+ *
+ * The note key is public. The membership secret behind the leaf is not — it is
+ * derived from this holder's key, and the page never sees it, which is the
+ * point: only their wallet can reproduce the leaf enrolled on their behalf.
+ */
+function renderEnrolment(holder) {
+  el('derive-out').innerHTML = '';
+  el('derive-progress').textContent = '';
+  el('btn-derive').disabled = !holder.enrolledLeaf;
+
+  el('enrol-fields').innerHTML = `
+    <dt>Note key</dt>
+    <dd class="mono-sm">${holder.noteKey ?? '—'} <span class="badge public">public</span></dd>
+
+    <dt>Membership secret</dt>
+    <dd class="hint">held by this holder — never sent to the page, never held by the issuer</dd>
+
+    <dt>Leaf on record</dt>
+    <dd class="mono-sm">${holder.enrolledLeaf
+      ? short(holder.enrolledLeaf, 14, 10)
+      : 'not enrolled yet'}<div class="hint">what the policy gate inserted under this name</div></dd>
+  `;
+}
+
+/** Re-derives the allow-list leaf from this holder's own keys, and compares. */
+async function deriveLeaf() {
+  const holder = current?.holder;
+  if (!holder?.enrolledLeaf) return;
+
+  el('btn-derive').disabled = true;
+  el('derive-progress').textContent = 'deriving from this wallet…';
+
+  try {
+    // The account owns the secret; the page only ever sees the resulting leaf.
+    const derived = await current.account.deriveAspUserLeaf();
+    // The CLI records a decimal, the SDK may answer in hex — compare as numbers.
+    const asBig = (v) => BigInt(/^0x/i.test(String(v)) ? String(v) : String(v).trim());
+    const match = asBig(derived) === asBig(holder.enrolledLeaf);
+
+    el('derive-out').innerHTML = `
+      <dl class="fields">
+        <dt>Derived here</dt>
+        <dd class="mono-sm ${match ? 'revealed' : ''}">${short(String(derived), 14, 10)}</dd>
+        <dt>Verdict</dt>
+        <dd>${match
+          ? '<span class="badge ok">matches the leaf on record</span>'
+          : '<span class="badge bad">does not match</span>'}</dd>
+      </dl>
+      <p class="hint" style="margin-top:12px">${match
+        ? `The enrolment standing in the allow-list under ${holder.name} was derived from
+           this holder's own key. Nobody could have enrolled a stranger in their place without
+           this check failing. It does not claim the allow-list holds nothing else — the policy
+           gate's guarantee is that no leaf is inserted for an address the identity register refuses.`
+        : `The leaf on record was not derived from this holder's key. Either the wallet is
+           opened on different keys than the ones enrolled, or the enrolment does not belong
+           to this holder — the check exists so the difference is visible.`}</p>`;
+    el('derive-progress').textContent = '';
+  } catch (error) {
+    el('derive-progress').textContent = `failed: ${error?.message ?? error}`;
+    console.error(error);
+  } finally {
+    el('btn-derive').disabled = false;
+  }
+}
+
 function renderNoteChoices(notes) {
   const box = el('disclose-notes');
   selectedNote = null;
@@ -109,6 +176,7 @@ function renderNoteChoices(notes) {
 async function selectHolder(name, { announce = true } = {}) {
   const holder = demo.holders.find((h) => h.name === name);
   renderPublic(holder);
+  renderEnrolment(holder);
   el('investor-private').innerHTML = '<p class="hint">Opening wallet…</p>';
   setProgress('deriving keys and syncing notes…', 'opening');
 
@@ -192,6 +260,7 @@ export async function mountInvestor(state) {
   });
 
   el('btn-disclose').addEventListener('click', generateReceipt);
+  el('btn-derive').addEventListener('click', deriveLeaf);
 
   await selectHolder(demo.holders[0].name, { announce: false });
 }

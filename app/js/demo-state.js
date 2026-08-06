@@ -70,6 +70,10 @@ export async function loadDemoState() {
       railBlocked: policy[h.name]?.blocked === 'true',
       allowlisted: policy[h.name]?.allowlisted === 'true',
       noteKey: policy[h.name]?.note_key,
+      // The allow-list leaf the policy gate enrolled under this holder's name.
+      // Kept so the holder can re-derive it from their own key and check that
+      // what was enrolled on their behalf is actually theirs.
+      enrolledLeaf: policy[h.name]?.leaf,
     })),
   };
 
