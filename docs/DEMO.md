@@ -116,3 +116,11 @@ This is the part that makes confidentiality acceptable rather than suspicious. H
 Restores revoked credentials, syncs policy, and sweeps coupons back to the treasury — in that order, because syncing after a proof is built invalidates it. Then clear site data in the browser; the script cannot reach the browser's own copy of the wallet.
 
 Sweeping spends the coupons, it does not erase them, and no browser-side reset will: they are on-chain history for that holder. A run that starts from an empty ledger of payments needs a fresh deployment, not a fresh browser.
+
+## Demo configuration, declared
+
+The browser signs with **local seed keys**, not a wallet extension — a recorded demo cannot afford an extension popup per payment and an account switch per role. The signer is a plain object satisfying the SDK's three-method interface ([app/js/local-signer.js](../app/js/local-signer.js)); `app/tools/key-gate.mjs` proves it derives the same keys the CLI does.
+
+Editing the registry and moving the allow-list and blocklist need the issuer's admin key and the Stellar CLI, so they run in [app/server.mjs](../app/server.mjs) rather than the page. In a real deployment that is the securitiser's internal service.
+
+The three roles share one page because they must: the payment SDK's storage holds an exclusive OPFS lock, and a second tab evicts the first. The wallet is a second page for the same reason it is not a second tab — [app/js/sdk-facade.js](../app/js/sdk-facade.js) claims a Web Lock before opening storage, so whichever page loads second says so in about two seconds rather than hanging for thirty with the cause visible only in the console. Verification is exempt by construction: it never opens storage, so the blocked page can still check a receipt produced by the other one.

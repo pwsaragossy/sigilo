@@ -113,3 +113,17 @@ text, kept separate so a sentence can be fixed without re-recording anything.
 > Everything shown ran against Stellar testnet. Transaction hashes are in the repository.
 
 > **github.com/pwsaragossy/sigilo**
+
+---
+
+## What this recording does not show
+
+These captions cover [`app/index.html`](../../app/index.html) — the three-role
+demo page, Issuer, Investor and Auditor.
+
+The holder's wallet, [`app/wallet.html`](../../app/wallet.html), is **not in this
+video**. Its private send, deposit, policy-gated withdrawal and the enrolment
+check a holder runs against their own key are described in the README under
+[The wallet](../../README.md#the-wallet), and the page is reachable from the
+demo's header — but nothing below this line was filmed. A separate wallet-only
+cut is roadmap, not a deliverable of this recording.

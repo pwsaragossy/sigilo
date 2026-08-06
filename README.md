@@ -2,13 +2,16 @@
 
 **Confidential coupon payments for tokenized private credit, on Stellar.**
 
-Revoking a holder's KYC credential stops them receiving new tokens, and does nothing to the money already inside the privacy pool.
+Enterprise / Compliance / RWA → [The demonstration](#the-demonstration).
+Confidential-token and private-payment wallets → [The wallet](#the-wallet).
+
+We revoked a holder's KYC credential and they withdrew from the privacy pool anyway: [`c2f2264a`](https://stellar.expert/explorer/testnet/tx/c2f2264ad3d599dac9f7205c3c987568794d83785a7085dcce39de871805aeeb), a real testnet transaction, published rather than deleted. That is the gap. A permissioned token and a confidential rail each enforce their own policy correctly and neither knows about the other, so revoking a credential does nothing to money already inside the pool.
 
 Everyone else proves you are on the list. Sigilo proves you are *not* — and does it where the money already is.
 
 ![One identity policy, two enforcement points](docs/img/policy-gate.svg)
 
-Sigilo binds OpenZeppelin's ERC-3643 permissioned token to Nethermind's confidential payment pool through an original Soroban contract — [`contracts/policy-bridge`](contracts/policy-bridge), 203 lines. Full attribution and pinned commits [below](#what-is-ours-and-what-is-not). Testnet only; see [Running the demo](#running-the-demo).
+Sigilo binds OpenZeppelin's ERC-3643 permissioned token to Nethermind's confidential payment pool through an original Soroban contract — [`contracts/policy-bridge`](contracts/policy-bridge), 368 lines of contract and 526 of tests. Full attribution and pinned commits [below](#what-is-ours-and-what-is-not). Testnet only; see [Running the demo](#running-the-demo).
 
 Every coupon an issuer pays on a public ledger is a published treasury statement: who was paid, when, how much. Institutions raise this first when they evaluate tokenized private credit, and today the answer is to accept it or leave the public chain. Sigilo pays those coupons confidentially, gates them with the same identity policy that gates the token, and lets a holder disclose one payment to an auditor without opening anything else.
 
@@ -45,12 +48,30 @@ The fifth row is the one to open. It is a successful withdrawal by a holder whos
 
 Full sequence and enforcement semantics: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#reference-run). Step-by-step walkthrough: [docs/DEMO.md](docs/DEMO.md).
 
+## The wallet
+
+A confidential balance is only worth holding if you can prove one line of it. That is the half most privacy wallets leave out, and it is the half that decides whether a holder can answer an accountant, a counterparty or a regulator without surrendering everything else at the same time. Hiding a balance is the easy part. Opening exactly one payment out of it, to someone who holds no keys, is the part that makes the hiding usable.
+
+**[`app/wallet.html`](app/wallet.html)** is the holder's side as its own page: the balance decrypted locally, a private send, a deposit, a withdrawal the policy gate can refuse, the payment history, the enrolment check a holder runs against their own key — and a receipt for one payment, verified on the same page by a panel with no keys, no storage and no account. Linked from the demo's header; it navigates rather than opening a tab, because the storage lock allows one page at a time.
+
+The demo's Investor tab shows the same balance from inside the issuer's story. This page is the holder's own, which is why the checks a holder runs against their own key live here and not there.
+
+**Nothing on the page is readable off it.** The amounts come out of note ciphertexts with the holder's own key. An observer reading the same transactions on an explorer sees `invoke_host_function` and two addresses — the position is public because a securities register should be, and every coupon paid against it is not.
+
+**Disclosure is theirs to give.** The holder picks one payment and proves that payment: the circuit requires the note's spending key, so not even the issuer can produce it on their behalf. Each disclosed field is marked **proven** or **attested**, because a zero-knowledge proof and a claim someone made are different objects and a receipt that blurs them is worse than no receipt. Raise the claimed amount by one digit and the verdict flips to Refused with `Proof: no` while the other checks still pass — the panel says which guarantee broke, not merely that one did.
+
+**The withdrawal is where the policy gate is felt.** A blocklisted holder is refused client-side, before a transaction exists, over coupons they already held. A refusal for any other reason — an empty balance, no spendable note — is reported as itself: the freeze is named only when the rail actually named it.
+
+**The enrolment is checkable by the person it was done to.** The wallet re-derives the allow-list leaf standing in the holder's name from their own key and compares it, which is what turns [the leaf trade-off](#the-trade-offs-behind-those-rows) into something detectable rather than something to be told. The secret behind it never reaches the page and the issuer never holds it, so a match means nobody enrolled a stranger in their place. It lives here and nowhere else — a check on your own key belongs on your own page, and one copy cannot drift from another.
+
+**What the wallet is not.** It opens the five seeded holders from throwaway keys, not an account you own; a real one holds a single key and asks a browser extension for it. Send, deposit and withdraw invoke the pool's own calls and are not part of the recorded reference run above — that run demonstrates the coupon cycle, the freeze and the disclosure. Proving is real work: roughly 9–13 s of Groth16 per operation, in a worker, and the page says so rather than looking hung.
+
 ## Verify this yourself
 
 Nothing here asks to be taken on trust. Three checks run without our deployment, our keys, or us:
 
 ```bash
-cd contracts/policy-bridge && cargo test   # 8 tests, led by the refusals:
+cd contracts/policy-bridge && cargo test   # 16 tests, led by the refusals:
                                            # revoke() fails while the registry still verifies (#3)
 node tools/verify-receipt.mjs --self-test  # the vendored SDK loads outside a browser, and the
                                            # exact receipt schema the auditor accepts
@@ -58,7 +79,7 @@ node app/tools/key-gate.mjs                # the browser signer derives the same
                                            # per holder — the demo's wallets are not staged
 ```
 
-`cargo test` names its own argument: `refuses_to_freeze_someone_still_in_good_standing` is the constraint nobody implements, because it costs the operator flexibility and buys them nothing until an investor sues.
+`cargo test` names its own argument: `refuses_to_freeze_someone_still_in_good_standing` is the constraint nobody implements, because it costs the operator flexibility and buys them nothing until an investor sues. Beside it, `a_decoy_holder_cannot_be_used_to_freeze_a_third_party` is the one that found a real defect in this contract — see [the leaf and the key](#the-trade-offs-behind-those-rows).
 
 And the two transactions that carry the whole argument, on a public explorer, no tooling at all:
 
@@ -87,67 +108,11 @@ Each of these is a decision, not an oversight. They are stated as what was trade
 
 **Revocation is retroactive and total, and that is the point.** A blocklisted holder cannot spend *anything* in the pool, including coupons received before the revocation. Surgical revocation would leave a sanctioned holder free to spend every pre-revocation coupon — exactly the failure this project exists to prevent. The cost is that a payment to a revoked holder is best described as held until they are re-credentialed, not as excluded. Re-credentialing lifts it.
 
-**The leaf derivation is trusted — and the failure is liveness, not safety.** An allow-list leaf is `poseidon2(note_public_key, asp_secret)`, computed off-chain because the ASP secret belongs to the holder and the contract never sees it. So the guarantee is that no leaf is inserted for an address the registry refuses, not that a given leaf belongs to the holder named beside it. An operator who inserts a wrong leaf denies that holder service — which they could already do by refusing to onboard them. They cannot use it to let an uncredentialed party spend, because the pool still requires a valid proof against a real note. Proving the derivation on-chain removes the assumption; that is a larger piece of work than this one. In the meantime the holder can **check it themselves** — [the wallet](#the-wallet) re-derives the leaf from their own key and compares it to the one on record.
+**The leaf derivation is trusted — and at `grant`, the failure is liveness, not safety.** An allow-list leaf is `poseidon2(note_public_key, asp_secret)`, computed off-chain because the ASP secret belongs to the holder and the contract never sees it. So the guarantee is that no leaf is inserted for an address the registry refuses, not that a given leaf belongs to the holder named beside it. An operator who inserts a wrong leaf denies that holder service — which they could already do by refusing to onboard them. They cannot use it to let an uncredentialed party spend, because the pool still requires a valid proof against a real note. Proving the derivation on-chain removes the assumption; that is a larger piece of work than this one. In the meantime the holder can **check it themselves** — [the wallet](#the-wallet) re-derives the leaf from their own key and compares it to the one on record.
+
+**The same reasoning was wrong at `revoke`, and that one was a safety hole.** This is the project's own negative result, kept here because the argument above is exactly the mistake that produced it. Freezing a holder means inserting their *note key* into the blocklist, and `revoke` used to take that key as an argument: the credential check ran against the `holder` named in the call while the write acted on whatever key was passed, with nothing joining them. An operator could therefore satisfy the gate with an uncredentialed decoy address of their own and hand it a credentialed holder's note key — which is public by design — and freeze an investor in good standing. A wrong leaf costs its own holder service; a wrong note key cost somebody else theirs. Treating both as one liveness trade-off is how it went unnoticed. It is closed now: `revoke` and `restore` take no key at all, reading the `Enrolment` written when the register approved that holder, and a reverse index refuses any attempt to bind one holder's key to another (`NoteKeyBound`, #7). Tests `a_decoy_holder_cannot_be_used_to_freeze_a_third_party` and `grant_twice_with_a_different_note_key_is_refused` fail if either guard is removed. **The testnet deployment still runs the version with the defect** — see [the note in ARCHITECTURE.md](docs/ARCHITECTURE.md#the-bridge-is-a-contract).
 
 **Enrolment needs the holder's consent, and the interface says so.** An allow-list leaf commits to the holder's ASP secret, which is theirs. Handing it over is what makes them identifiable to the policy operator. The demo reads it from the CLI's local state; a real deployment collects it during onboarding, and the holder knows it did.
-
-## The wallet
-
-A confidential balance is only worth holding if you can prove one line of it. That is the half most privacy wallets leave out, and it is the half that decides whether a holder can answer an accountant, a counterparty or a regulator without surrendering everything else at the same time. Hiding a balance is the easy part. Opening exactly one payment out of it, to someone who holds no keys, is the part that makes the hiding usable.
-
-**[`app/wallet.html`](app/wallet.html)** is the holder's side as its own page: the balance decrypted locally, a private send, a deposit, a withdrawal the policy gate can refuse, the payment history, the enrolment check a holder runs against their own key — and a receipt for one payment, verified on the same page by a panel with no keys, no storage and no account. Linked from the demo's header; it navigates rather than opening a tab, because the storage lock allows one page at a time.
-
-The demo's Investor tab shows the same balance from inside the issuer's story. This page is the holder's own, which is why the checks a holder runs against their own key live here and not there.
-
-**Nothing on the page is readable off it.** The amounts come out of note ciphertexts with the holder's own key. An observer reading the same transactions on an explorer sees `invoke_host_function` and two addresses — the position is public because a securities register should be, and every coupon paid against it is not.
-
-**Disclosure is theirs to give.** The holder picks one payment and proves that payment: the circuit requires the note's spending key, so not even the issuer can produce it on their behalf. Each disclosed field is marked **proven** or **attested**, because a zero-knowledge proof and a claim someone made are different objects and a receipt that blurs them is worse than no receipt. Raise the claimed amount by one digit and the verdict flips to Refused with `Proof: no` while the other checks still pass — the panel says which guarantee broke, not merely that one did.
-
-**The withdrawal is where the policy gate is felt.** A blocklisted holder is refused client-side, before a transaction exists, over coupons they already held. A refusal for any other reason — an empty balance, no spendable note — is reported as itself: the freeze is named only when the rail actually named it.
-
-**The enrolment is checkable by the person it was done to.** The wallet re-derives the allow-list leaf standing in the holder's name from their own key and compares it, which is what turns [the leaf trade-off above](#the-trade-offs-behind-those-rows) into something detectable rather than something to be told. The secret behind it never reaches the page and the issuer never holds it, so a match means nobody enrolled a stranger in their place. It lives here and nowhere else — a check on your own key belongs on your own page, and one copy cannot drift from another.
-
-**What the wallet is not.** It opens the five seeded holders from throwaway keys, not an account you own; a real one holds a single key and asks a browser extension for it. Send, deposit and withdraw invoke the pool's own calls and are not part of the recorded reference run above — that run demonstrates the coupon cycle, the freeze and the disclosure. Proving is real work: roughly 9–13 s of Groth16 per operation, in a worker, and the page says so rather than looking hung.
-
-## Using it in your own deployment
-
-The reusable piece is [`contracts/policy-bridge`](contracts/policy-bridge) — one Soroban contract, 203 lines. Everything else in this repository exists to demonstrate it.
-
-**What you need already.** The contract does not deploy an identity registry or a confidential pool; it binds two you already run. It calls them by name, so yours must expose these:
-
-| Component | What the contract calls |
-|---|---|
-| Identity verifier (ERC-3643 / OZ RWA) | `verify_identity(address)` — reports failure by trapping, which is read as *not credentialed* |
-| Allow-list (ASP membership) | `insert_leaf(leaf)`, plus `update_admin(new_admin)` once |
-| Blocklist (ASP non-membership) | `insert_leaf(key, value)` to freeze, `delete_leaf(key)` to lift, plus `update_admin(new_admin)` once |
-
-**Deploy it** with the four addresses it will govern:
-
-```bash
-stellar contract deploy --wasm policy_bridge.wasm \
-  -- --operator <your issuer key> --verifier <identity verifier> \
-     --allowlist <asp membership> --blocklist <asp non-membership>
-```
-
-**Then hand over both trees — this is the step that matters.** Until the association sets name the contract as their admin, the operator can still write to them directly and every guarantee below is decorative:
-
-```bash
-stellar contract invoke --id <allowlist> -- update_admin --new_admin <bridge>
-stellar contract invoke --id <blocklist> -- update_admin --new_admin <bridge>
-```
-
-**Verify you locked yourself out.** Try to write to a tree directly; the network should refuse you, because the contract that now owns it has no private key:
-
-```bash
-stellar contract invoke --id <allowlist> --source <issuer> -- insert_leaf --leaf 1
-# error: Missing signing key for account C…
-```
-
-[`scripts/deploy-bridge.sh`](scripts/deploy-bridge.sh) does all four steps and ends with that check, printing a warning if the handover did not take.
-
-**From then on**, `grant(holder, leaf)`, `revoke(holder, note_key)` and `restore(holder, note_key)` replace every direct write. Each asks the registry first and refuses to contradict it — `grant` fails with `NotCredentialed` (#2), `revoke` fails with `StillCredentialed` (#3). `is_credentialed(holder)` is a public read, so anyone can check the decision the contract acted on, and every call emits a `PolicyChanged` event, so an auditor reconstructs who was enrolled or frozen and when without asking you.
-
-**The honest limit on portability.** Those function names and arities are how the contract talks to its neighbours, and they match Nethermind's ASP contracts and OpenZeppelin's verifier at the pinned commits. Different components mean editing those call sites — the pattern transfers, the exact invocations may not. And this is testnet work on unaudited alpha dependencies: adopt the design, not this build, for anything holding real value.
 
 ## What is ours, and what is not
 
@@ -155,11 +120,11 @@ Judges at this event will see a lot of demos built on the same two libraries, so
 
 **Not ours.** The privacy pool, its Groth16 circuits, the association-set (ASP) contracts and the web SDK are Nethermind's [stellar-private-payments](https://github.com/NethermindEth/stellar-private-payments). The permissioned-token suite is OpenZeppelin's [RWA / ERC-3643 implementation](https://github.com/OpenZeppelin/stellar-contracts). Both Apache-2.0, both used unmodified, both pinned by commit in [NOTICE](NOTICE).
 
-**Ours.** [`contracts/policy-bridge`](contracts/policy-bridge) — 203 lines, plus 265 lines of tests. The on-chain policy gate that binds the two, and the argument for why one is needed.
+**Ours.** [`contracts/policy-bridge`](contracts/policy-bridge) — 368 lines, plus 526 lines of tests. The on-chain policy gate that binds the two, and the argument for why one is needed. To put it in front of your own registry and pool, see [Using it in your own deployment](docs/ARCHITECTURE.md#using-it-in-your-own-deployment).
 
 A permissioned token asks an identity registry who may hold it. Confidential payments prove, against an allow-list and a blocklist, who may spend. Each enforces its own policy correctly, and neither knows about the other: **revoking a holder's credential does nothing to funds already inside the pool.**
 
-The contract closes that gap without asking anyone to be trusted. It owns both lists and consults the registry before moving either — `grant` fails unless the registry verifies the holder, `revoke` fails while it still does. So an operator can neither invent a credential nor manufacture a freeze against an investor in good standing. Their own attempt to reach the lists directly is refused by the network:
+The contract closes that gap without asking anyone to be trusted. It owns both lists and consults the registry before moving either — `grant` fails unless the registry verifies the holder (`NotCredentialed`, #2), `revoke` fails while it still does (`StillCredentialed`, #3). So an operator cannot invent a credential. Nor can they manufacture a freeze against an investor in good standing: `revoke` takes no key, acting only on the `Enrolment` recorded when the register approved that holder (`NotEnrolled`, #4, when there is none), and a note key already bound to one holder cannot be re-bound to another (`NoteKeyBound`, #7). That second half is a repair, not an original claim — the first version took the key as an argument and the guarantee did not hold; [the trade-offs section](#the-trade-offs-behind-those-rows) says how. Their own attempt to reach the lists directly is refused by the network:
 
 ```
 error: Missing signing key for account CCCVU6BZA4JRPZNYGCEMFYNV2DN3RJ676EY25NGMKSAMS4PFCRHE6JID
@@ -198,23 +163,7 @@ brew install llvm
 export CC_wasm32_unknown_unknown=$(brew --prefix llvm)/bin/clang
 ```
 
-### Demo configuration, declared
-
-The browser signs with **local seed keys**, not a wallet extension — a recorded demo cannot afford an extension popup per payment and an account switch per role. The signer is a plain object satisfying the SDK's three-method interface ([app/js/local-signer.js](app/js/local-signer.js)); `app/tools/key-gate.mjs` proves it derives the same keys the CLI does.
-
-Editing the registry and moving the allow-list and blocklist need the issuer's admin key and the Stellar CLI, so they run in [app/server.mjs](app/server.mjs) rather than the page. In a real deployment that is the securitiser's internal service.
-
-The three roles share one page because they must: the payment SDK's storage holds an exclusive OPFS lock, and a second tab evicts the first. The wallet is a second page for the same reason it is not a second tab — [app/js/sdk-facade.js](app/js/sdk-facade.js) claims a Web Lock before opening storage, so whichever page loads second says so in about two seconds rather than hanging for thirty with the cause visible only in the console. Verification is exempt by construction: it never opens storage, so the blocked page can still check a receipt produced by the other one.
-
-## Layout
-
-```
-app/            three-role demo interface, holder wallet, issuer back-office server
-scripts/        deployment, policy gate, credential and key management
-tools/          leaf derivation, receipt verification probe
-vendor/         rebuilt payment SDK, pinned against our own deployment
-docs/           architecture, enforcement semantics, reference run
-```
+Demo configuration — local seed keys, the server-side admin key, and the single-page storage lock — is declared in [docs/DEMO.md](docs/DEMO.md#demo-configuration-declared).
 
 ## Built on
 
